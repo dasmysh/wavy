@@ -1,0 +1,36 @@
+file(RELATIVE_PATH PROJECT_REL_PATH ${PROJECT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
+
+file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
+    *.h
+    *.hpp
+    *.inl
+    *.cpp)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_FILES})
+
+
+file(GLOB_RECURSE INCLUDE_FILES CONFIGURE_DEPENDS
+    ${PROJECT_SOURCE_DIR}/include/${PROJECT_REL_PATH}/*.h
+    ${PROJECT_SOURCE_DIR}/include/${PROJECT_REL_PATH}/*.hpp
+    ${PROJECT_SOURCE_DIR}/include/${PROJECT_REL_PATH}/*.inl)
+source_group(TREE ${PROJECT_SOURCE_DIR}/include/${PROJECT_REL_PATH} FILES ${INCLUDE_FILES})
+
+file(GLOB TOP_FILES CONFIGURE_DEPENDS
+    ${PROJECT_SOURCE_DIR}/Readme.md
+    ${PROJECT_SOURCE_DIR}/.clang-tidy
+    ${PROJECT_SOURCE_DIR}/.clang-format
+    ${CMAKE_BINARY_DIR}/glm.natvis
+    ${CMAKE_BINARY_DIR}/imgui.natvis
+    ${CMAKE_BINARY_DIR}/imgui.gdb
+    ${CMAKE_BINARY_DIR}/imgui.natstepfilter)
+source_group(" " FILES ${TOP_FILES})
+
+
+add_executable(${APPLICATION_NAME} ${SRC_FILES} ${INCLUDE_FILES} ${EXTERN_SOURCES} ${TOP_FILES})
+target_link_libraries(${APPLICATION_NAME} PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings fmt::fmt spdlog::spdlog cereal::cereal glm::glm imgui::imgui)
+target_link_libraries(${APPLICATION_NAME} PRIVATE glfw)
+target_include_directories(${APPLICATION_NAME} PUBLIC
+    ${PROJECT_SOURCE_DIR}/include/${PROJECT_REL_PATH}
+    ${CMAKE_CURRENT_SOURCE_DIR})
+set_property(DIRECTORY ${PROJECT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${APPLICATION_NAME})
+set_target_properties(${APPLICATION_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+set_project_static_analyzer(${APPLICATION_NAME})

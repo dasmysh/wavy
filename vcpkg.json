@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "fluidsim",
+  "version": "0.0.1",
+  "dependencies": [
+    "catch2",
+    "docopt",
+    "fmt",
+    "spdlog",
+    "cereal",
+    "glm",
+    "glfw3",
+    "imgui"
+  ]
+}
