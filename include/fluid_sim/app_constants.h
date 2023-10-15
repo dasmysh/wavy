@@ -32,4 +32,17 @@ namespace fluid {
 #else
     constexpr bool debug_build = true;
 #endif
+
+    enum class InterpolationMethod
+    {
+        Linear, Cubic
+    };
+
+    enum class IntegrationMethod
+    {
+        RK2, RK3, RK4
+    };
+
+    constexpr InterpolationMethod interpolation_method = InterpolationMethod::Linear;
+    constexpr IntegrationMethod integration_method = IntegrationMethod::RK2;
 }
