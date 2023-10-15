@@ -14,6 +14,7 @@
 #include <array>
 #include <concepts>
 #include <type_traits>
+#include <string>
 
 namespace mysh::core {
 
@@ -42,10 +43,8 @@ namespace mysh::core {
     struct has_contiguous_memory<aligned_vector<T>> : std::true_type {};
 
 
-    template<typename T> concept contiguous_memory = requires
-    {
+    template<typename T> concept contiguous_memory = 
         std::derived_from<has_contiguous_memory<T>, std::true_type>;
-    };
 
 
     template<contiguous_memory T> std::size_t byteSizeOf(const T& data)
