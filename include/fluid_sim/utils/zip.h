@@ -34,6 +34,7 @@ namespace fluid::utils
             using iterator_tuple = std::tuple<Iters ...>;
             using difference_type = std::ptrdiff_t;
             using value_type = std::tuple<select_access_type_for<Iters>...>;
+            using reference = std::tuple<typename Iters::reference ...>;
             using iterator_category = std::forward_iterator_tag;
 
             zip_iterator() = default;
@@ -59,9 +60,9 @@ namespace fluid::utils
                 return result;
             }
 
-            auto operator*() const
+            reference operator*() const
             {
-                return std::apply([](auto&&... iterators) { return value_type(*iterators...); }, m_iterators);
+                return std::apply([](auto&&... iterators) { return reference(*iterators...); }, m_iterators);
             }
 
         private:
@@ -72,7 +73,8 @@ namespace fluid::utils
         class zip_wrapper
         {
         public:
-            using zip_iterator_type = zip_iterator<select_iterator_for<Ts> ...>;
+            using const_iterator = zip_iterator<select_iterator_for<const Ts> ...>;
+            using iterator = zip_iterator<select_iterator_for<Ts> ...>;
 
             template<NonZipWrapperRange... Args>
             explicit zip_wrapper(Args&&... iterables)
@@ -82,12 +84,12 @@ namespace fluid::utils
 
             auto begin()
             {
-                return std::apply([](auto&&... iterable) { return zip_iterator_type(std::begin(iterable)...); },
+                return std::apply([](auto&&... iterable) { return iterator(std::begin(iterable)...); },
                                   m_iterables);
             }
             auto end()
             {
-                return std::apply([](auto&&... iterable) { return zip_iterator_type(std::end(iterable)...); },
+                return std::apply([](auto&&... iterable) { return iterator(std::end(iterable)...); },
                                   m_iterables);
             }
 

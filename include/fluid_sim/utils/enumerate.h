@@ -26,7 +26,6 @@ namespace fluid::utils
         public:
             using difference_type = std::ptrdiff_t;
             using value_type = std::tuple<counter_type, typename iterator_type::value_type>;
-            using pointer = std::tuple<counter_type, typename iterator_type::pointer>;
             using reference = std::tuple<counter_type, typename iterator_type::reference>;
             using iterator_category = std::forward_iterator_tag;
 
@@ -53,7 +52,7 @@ namespace fluid::utils
                 return result;
             }
 
-            auto operator*() const { return std::tie(i, *iter); }
+            auto operator*() const { return reference{i, *iter}; }
             auto& operator->() const { return *iter; }
         };
     }
