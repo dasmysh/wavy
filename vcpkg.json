@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
-  "name": "fluidsim",
+  "name": "wavy",
   "version": "0.0.1",
   "dependencies": [
     "catch2",
@@ -8,6 +8,7 @@
     "fmt",
     "spdlog",
     "cereal",
+    "eigen3",
     "glm",
     "glfw3",
     "imgui"

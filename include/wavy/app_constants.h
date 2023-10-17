@@ -13,7 +13,7 @@
 
 namespace fluid {
     /** The application name. */
-    constexpr std::string_view applicationName = "fluid_sim";
+    constexpr std::string_view applicationName = "wavy";
     /** The application version. */
     constexpr std::uint32_t applicationVersionMajor = 0;
     constexpr std::uint32_t applicationVersionMinor = 0;
@@ -25,7 +25,7 @@ namespace fluid {
     /** Use a timestamp for the log files. */
     constexpr bool LOG_USE_TIMESTAMPS = false;
     /** Log file application tag. */
-    constexpr std::string_view logTag = "fluid";
+    constexpr std::string_view logTag = "wavy";
 
 #ifdef NDEBUG
     constexpr bool debug_build = false;

@@ -28,7 +28,7 @@ file(GLOB TOP_FILES CONFIGURE_DEPENDS
 source_group(" " FILES ${TOP_FILES})
 
 add_library(${APPLICATION_NAME}_lib OBJECT ${SRC_FILES} ${INCLUDE_FILES} ${EXTERN_SOURCES} ${TOP_FILES})
-target_link_libraries(${APPLICATION_NAME}_lib PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings fmt::fmt spdlog::spdlog cereal::cereal glm::glm imgui::imgui)
+target_link_libraries(${APPLICATION_NAME}_lib PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings fmt::fmt spdlog::spdlog cereal::cereal Eigen3::Eigen glm::glm imgui::imgui)
 target_link_libraries(${APPLICATION_NAME}_lib PRIVATE glfw)
 target_include_directories(${APPLICATION_NAME}_lib PUBLIC
     ${PROJECT_SOURCE_DIR}/include/${PROJECT_REL_PATH}

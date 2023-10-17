@@ -1,1 +1,1 @@
-add_subdirectory(fluid_sim)
+add_subdirectory(${APPLICATION_NAME})

@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.27.1)
 
-set(APPLICATION_NAME fluid_sim)
+set(APPLICATION_NAME wavy)
 project(${APPLICATION_NAME} CXX)
-string(TOUPPER "fluid" NAMESPACE)
+string(TOUPPER "wavy" NAMESPACE)
 
 include(cmake/StandardProjectSettings.cmake)
 
@@ -46,6 +46,7 @@ find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
+find_package(Eigen3 CONFIG REQUIRED)
 
 if(NOT EXISTS "${CMAKE_BINARY_DIR}/glm.natvis")
   message(

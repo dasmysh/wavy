@@ -24,6 +24,17 @@ namespace fluid
             EMPTY
         };
 
+        struct LabeledCellIndex
+        {
+            std::size_t index : 24;
+            Label label;
+            LabeledCellIndex& operator++()
+            {
+                index += 1;
+                return *this;
+            }
+        };
+
         FluidSolverBase(
             std::size_t grid_size,
             const std::function<Label(const std::span<Label>&, std::size_t)>& labels_handler);

@@ -1,9 +1,9 @@
-# Fluid Simulation
-Playground for testing out fluid simulation.
+# Wavy
+Wavy is a playground project for fluid simulations.
 - Clone repository with submodules recursive:
 
-  ```git clone --recurse-submodules -j8 https://github.com/dasmysh/fluid_sim.git ```
-  ```cd fluid_sim```
+  ```git clone --recurse-submodules -j8 https://github.com/dasmysh/wavy.git ```
+  ```cd wavy```
 
 - Start CMake from this folder with:
 
