@@ -6,7 +6,7 @@
 #include <numeric>
 #include <vector>
 
-namespace fluid::utils
+namespace wavy::utils
 {
     class enumerate_fixture
     {
@@ -42,7 +42,7 @@ namespace fluid::utils
         std::vector<std::size_t> v1;
     };
 
-    TEST_CASE_METHOD(enumerate_fixture, "fluid::utils::enumerate.range based for loop", "[enumerate][range_based_for]")
+    TEST_CASE_METHOD(enumerate_fixture, "wavy::utils::enumerate.range based for loop", "[enumerate][range_based_for]")
     {
         for (const auto& [index, value] : enumerate_v()) { REQUIRE(index == value); }
 
@@ -51,7 +51,7 @@ namespace fluid::utils
         for (const auto& [index, value] : enumerate_v()) { REQUIRE(index + 5 == value); }
     }
 
-    TEST_CASE_METHOD(enumerate_fixture, "fluid::utils::enumerate.for_each with std_par", "[enumerate][std::for_each]")
+    TEST_CASE_METHOD(enumerate_fixture, "wavy::utils::enumerate.for_each with std_par", "[enumerate][std::for_each]")
     {
         auto enum_v = enumerate_v();
         std::for_each(std::execution::par, std::begin(enum_v), std::end(enum_v), [](auto v_element) {
@@ -69,7 +69,7 @@ namespace fluid::utils
         });
     }
 
-    TEST_CASE_METHOD(enumerate_fixture, "fluid::utils.enumerate.copy and move constructors", "[enumerate][range_based_for]")
+    TEST_CASE_METHOD(enumerate_fixture, "wavy::utils.enumerate.copy and move constructors", "[enumerate][range_based_for]")
     {
         auto enum_wrapper = enumerate_v();
         for (auto enum_wrapper2{enum_wrapper}; auto [index, value] : enum_wrapper2) {
@@ -81,7 +81,7 @@ namespace fluid::utils
         for (const auto& [index, value] : enum_wrapper3) { REQUIRE(index + 99 == value); }
     }
 
-    TEST_CASE_METHOD(enumerate_fixture, "fluid::utils.enumerate.copy and move constructors with parallel for_each", "[enumerate][std::for_each]")
+    TEST_CASE_METHOD(enumerate_fixture, "wavy::utils.enumerate.copy and move constructors with parallel for_each", "[enumerate][std::for_each]")
     {
         auto enum_wrapper = enumerate_v();
         auto enum_wrapper2{enum_wrapper};
@@ -102,7 +102,7 @@ namespace fluid::utils
         });
     }
 
-    TEST_CASE_METHOD(enumerate_fixture_nested, "fluid::utils.enumerate.nested zip",
+    TEST_CASE_METHOD(enumerate_fixture_nested, "wavy::utils.enumerate.nested zip",
                      "[enumerate][nested][range_based_for]")
     {
         for (auto [index, value] : enumerate_v()) {
@@ -117,7 +117,7 @@ namespace fluid::utils
         }
     }
 
-    TEST_CASE_METHOD(enumerate_fixture_nested, "fluid::utils.enumerate.nested zip with parallel for_each",
+    TEST_CASE_METHOD(enumerate_fixture_nested, "wavy::utils.enumerate.nested zip with parallel for_each",
                      "[enumerate][nested][std::for_each]")
     {
         {

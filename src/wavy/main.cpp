@@ -22,18 +22,18 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
 {
     try {
         constexpr std::string_view directory; // = "";
-        constexpr std::string_view name = fluid::logFileName;
+        constexpr std::string_view name = wavy::logFileName;
 
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         console_sink->set_level(spdlog::level::warn);
-        console_sink->set_pattern(fmt::format("[{}] [%^%l%$] %v", fluid::logTag));
+        console_sink->set_pattern(fmt::format("[{}] [%^%l%$] %v", wavy::logTag));
 
         auto devenv_sink = std::make_shared<spdlog::sinks::msvc_sink_mt>();
         devenv_sink->set_level(spdlog::level::err);
-        devenv_sink->set_pattern(fmt::format("[{}] [%^%l%$] %v", fluid::logTag));
+        devenv_sink->set_pattern(fmt::format("[{}] [%^%l%$] %v", wavy::logTag));
 
         std::shared_ptr<spdlog::sinks::base_sink<std::mutex>> file_sink;
-        if constexpr (fluid::debug_build) {
+        if constexpr (wavy::debug_build) {
             file_sink = std::make_shared<mysh::core::spdlog::sinks::rotating_open_file_sink_mt>(
                 directory.empty() ? std::string{name} : std::string{directory}.append("/").append(name), 5);
             file_sink->set_level(spdlog::level::trace);
@@ -44,12 +44,12 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
         }
 
         const spdlog::sinks_init_list sink_list = {file_sink, console_sink, devenv_sink};
-        auto logger = std::make_shared<spdlog::logger>(fluid::logTag.data(), sink_list.begin(), sink_list.end());
+        auto logger = std::make_shared<spdlog::logger>(wavy::logTag.data(), sink_list.begin(), sink_list.end());
 
         spdlog::set_default_logger(logger);
         spdlog::flush_on(spdlog::level::err);
 
-        if constexpr (fluid::debug_build) {
+        if constexpr (wavy::debug_build) {
             spdlog::set_level(spdlog::level::trace);
         } else {
             spdlog::set_level(spdlog::level::err);

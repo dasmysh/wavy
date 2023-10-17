@@ -6,7 +6,7 @@
 #include <numeric>
 #include <vector>
 
-namespace fluid::utils
+namespace wavy::utils
 {
     class zip_fixture
     {
@@ -27,7 +27,7 @@ namespace fluid::utils
         std::vector<std::size_t> v1;
     };
 
-    TEST_CASE_METHOD(zip_fixture , "fluid::utils.zip.range based for loop", "[zip][range_based_for]")
+    TEST_CASE_METHOD(zip_fixture , "wavy::utils.zip.range based for loop", "[zip][range_based_for]")
     {
         for (const auto& [value0, value1] : zip_v()) { REQUIRE(value0 + 10 == value1); }
 
@@ -36,7 +36,7 @@ namespace fluid::utils
         for (const auto& [value0, value1] : zip_v()) { REQUIRE(value0 + 5 == value1); }
     }
 
-    TEST_CASE_METHOD(zip_fixture, "fluid::utils.zip.for_each with std_par", "[zip][std::for_each]")
+    TEST_CASE_METHOD(zip_fixture, "wavy::utils.zip.for_each with std_par", "[zip][std::for_each]")
     {
         auto zipper = zip_v();
         std::for_each(std::execution::par, std::begin(zipper), std::end(zipper), [](auto v_element) {
@@ -54,7 +54,7 @@ namespace fluid::utils
         });
     }
 
-    TEST_CASE_METHOD(zip_fixture, "fluid::utils.zip.copy and move constructors", "[zip][range_based_for]")
+    TEST_CASE_METHOD(zip_fixture, "wavy::utils.zip.copy and move constructors", "[zip][range_based_for]")
     {
         auto zipper = zip_v();
         for (auto zipper2{zipper}; auto [value0, value1] : zipper2) {
@@ -67,7 +67,7 @@ namespace fluid::utils
         }
     }
 
-    TEST_CASE_METHOD(zip_fixture, "fluid::utils.zip.copy and move constructors with parallel for_each",
+    TEST_CASE_METHOD(zip_fixture, "wavy::utils.zip.copy and move constructors with parallel for_each",
                      "[enumerate][std::for_each]")
     {
         auto zipper = zip_v();
@@ -88,7 +88,7 @@ namespace fluid::utils
         });
     }
 
-    TEST_CASE_METHOD(zip_fixture, "fluid::utils.zip.nested enumerate", "[enumerate][nested][range_based_for]")
+    TEST_CASE_METHOD(zip_fixture, "wavy::utils.zip.nested enumerate", "[enumerate][nested][range_based_for]")
     {
         for (auto [value0, value1] : zip_nested_v()) {
             auto index = std::get<0>(value0);
@@ -103,7 +103,7 @@ namespace fluid::utils
         }
     }
 
-    TEST_CASE_METHOD(zip_fixture, "fluid::utils.zip.nested enumerate with parallel for_each",
+    TEST_CASE_METHOD(zip_fixture, "wavy::utils.zip.nested enumerate with parallel for_each",
                      "[enumerate][nested][std::for_each]")
     {
         {

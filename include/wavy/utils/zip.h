@@ -12,7 +12,7 @@
 
 #include <tuple>
 
-namespace fluid::utils
+namespace wavy::utils
 {
     namespace zip_detail
     {

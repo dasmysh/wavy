@@ -1,6 +1,6 @@
 /**
  * @file   constants.h
- * @author Sebastian Maisch <Sebastian Maisch_EMAIL>
+ * @author Sebastian Maisch <sebastian.maisch@googlemail.com>
  * @date   2023.10.06
  *
  * @brief  Contains global constant definitions.
@@ -11,7 +11,8 @@
 #include <cstdint>
 #include <string_view>
 
-namespace fluid {
+namespace wavy
+{
     /** The application name. */
     constexpr std::string_view applicationName = "wavy";
     /** The application version. */

@@ -16,7 +16,7 @@
 #include <execution>
 #include <ranges>
 
-namespace fluid
+namespace wavy
 {
     namespace detail
     {

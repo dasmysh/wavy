@@ -11,7 +11,7 @@
 #include <functional>
 #include <span>
 
-namespace fluid::utils
+namespace wavy::utils
 {
     template<typename T>
     class boundary_span

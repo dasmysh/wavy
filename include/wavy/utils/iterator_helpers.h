@@ -11,7 +11,7 @@
 #include <ranges>
 #include <vector>
 
-namespace fluid::utils
+namespace wavy::utils
 {
     template<typename T>
     using select_iterator_for =

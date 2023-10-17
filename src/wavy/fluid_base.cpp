@@ -12,7 +12,8 @@
 #include <glm/glm.hpp>
 #include <numeric>
 
-namespace fluid {
+namespace wavy
+{
     FluidSolverBase::FluidSolverBase(
         std::size_t grid_size,
         const std::function<Label(const std::span<Label>&, std::size_t)>& labels_handler)

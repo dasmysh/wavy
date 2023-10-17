@@ -1,6 +1,6 @@
 /**
  * @file   main.h
- * @author Sebastian Maisch <Sebastian Maisch_EMAIL>
+ * @author Sebastian Maisch <sebastian.maisch@googlemail.com>
  * @date   2023.10.06
  *
  * @brief  Includes common headers and defines common templates.

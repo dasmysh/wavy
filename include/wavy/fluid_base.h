@@ -10,7 +10,7 @@
 
 #include "utils/boundary_span.h"
 
-namespace fluid
+namespace wavy
 {
     class FluidSolverBase
     {

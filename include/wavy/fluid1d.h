@@ -13,7 +13,7 @@
 
 #include <vector>
 
-namespace fluid
+namespace wavy
 {
     class FluidSolver1D : public FluidSolverBase
     {
