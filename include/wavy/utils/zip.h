@@ -53,7 +53,7 @@ namespace wavy::utils
                 return *this;
             }
 
-            zip_iterator operator++(int)
+            zip_iterator operator++(int) // NOLINT(cert-dcl21-cpp)
             {
                 auto result = *this;
                 ++*this;

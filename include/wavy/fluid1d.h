@@ -29,22 +29,24 @@ namespace wavy
                      mysh::core::function_view<float(std::size_t idx)> u_solid);
 
     private:
-        float estimateAdvectionDeltaT() const;
-        float estimateBodyForcesDeltaT() const;
-        float estimateProjectDeltaT() const;
+        [[nodiscard]] float estimateAdvectionDeltaT() const;
+        [[nodiscard]] float estimateBodyForcesDeltaT() const;
+        [[nodiscard]] float estimateProjectDeltaT() const;
 
         void presure_gradient_rhs(const std::vector<float>& u, std::vector<float>& rhs, mysh::core::function_view<float(std::size_t idx)> u_solid) const;
         void setup_A(float delta_t);
 
-        float toPosition(std::size_t index) const;
-        std::size_t toGrid(float position) const;
+        [[nodiscard]] float toPosition(std::size_t index) const;
+        [[nodiscard]] std::size_t toGrid(float position) const;
 
-        float interpolate(const utils::boundary_span<const float>& q, float x_P) const;
-        float integrate(const utils::boundary_span<const float>& f, float q, float delta_t) const;
+        [[nodiscard]] float interpolate(const utils::boundary_span<const float>& q, float x_P) const;
+        [[nodiscard]] float integrate(const utils::boundary_span<const float>& f, float q, float delta_t) const;
 
+         // NOLINTBEGIN(cppcoreguidelines-avoid-const-or-ref-data-members)
         const float m_delta_x;
         const float m_g;
         const float m_density;
+        // NOLINTEND(cppcoreguidelines-avoid-const-or-ref-data-members)
 
         float tn0 = 0.0f;
         std::vector<float> m_position;

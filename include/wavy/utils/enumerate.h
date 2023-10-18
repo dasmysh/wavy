@@ -32,7 +32,7 @@ namespace wavy::utils
             iterator() = default;
 
             explicit iterator(iterator_type it)
-                : iter(it)
+                : iter(std::move(it))
             {
             }
 
@@ -45,7 +45,7 @@ namespace wavy::utils
                 return *this;
             }
 
-            iterator operator++(int)
+            iterator operator++(int) // NOLINT(cert-dcl21-cpp)
             {
                 auto result = *this;
                 ++*this;
@@ -61,7 +61,7 @@ namespace wavy::utils
     {
         struct enumerate_wrapper
         {
-            T iterable;
+            T iterable; // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
 
             using const_iterator = enum_detail::iterator<select_iterator_for<const T>>;
             using iterator = enum_detail::iterator<select_iterator_for<T>>;

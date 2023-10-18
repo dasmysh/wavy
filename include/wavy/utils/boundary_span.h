@@ -20,18 +20,18 @@ namespace wavy::utils
         using content_type = std::span<T>;
         using boundary_fn = std::function<T(const content_type&, std::size_t)>;
 
-        constexpr boundary_span(content_type content, const boundary_fn& handle_boundary)
+        constexpr boundary_span(content_type content, boundary_fn handle_boundary)
             : m_content{content}
-            , m_handle_boundary{handle_boundary}
+            , m_handle_boundary{std::move(handle_boundary)}
         {
         }
 
-        constexpr content_type& get_content() { return m_content; }
-        constexpr const content_type& get_content() const { return m_content; }
+        [[nodiscard]] constexpr content_type& get_content() { return m_content; }
+        [[nodiscard]] constexpr const content_type& get_content() const { return m_content; }
 
-        constexpr T operator[](std::size_t idx) const
+        [[nodiscard]] constexpr T operator[](std::size_t idx) const
         {
-            if (idx < 0 || idx >= m_content.size()) return m_handle_boundary(m_content, idx);
+            if (idx < 0 || idx >= m_content.size()) { return m_handle_boundary(m_content, idx); }
             return m_content[idx];
         }
 

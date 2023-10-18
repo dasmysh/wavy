@@ -28,13 +28,13 @@ namespace wavy
         template<Increasable T>
         struct iota_step
         {
-            iota_step(const T& init, const T& inc)
+            iota_step(const T& init, const T& inc) // NOLINT(bugprone-easily-swappable-parameters)
                 : val{init}
                 , increase{ inc }
             {
             }
 
-            operator T() const { return val; }
+            operator T() const { return val; } // NOLINT(hicpp-explicit-conversions)
             iota_step& operator++()
             {
                 val += increase;
@@ -46,7 +46,7 @@ namespace wavy
         };
     }
 
-    FluidSolver1D::FluidSolver1D(std::size_t grid_size, float delta_x, float g, float density)
+    FluidSolver1D::FluidSolver1D(std::size_t grid_size, float delta_x, float g, float density) // NOLINT(bugprone-easily-swappable-parameters)
         : FluidSolverBase{grid_size,
                           [](const std::span<Label>&, [[maybe_unused]] std::size_t idx) {
                               return Label::SOLID;
@@ -113,12 +113,13 @@ namespace wavy
                       });
     }
 
-    void FluidSolver1D::bodyForces(float delta_t, const std::vector<float>& qn0, std::vector<float>& qn1) const
+    void FluidSolver1D::bodyForces(float delta_t, const std::vector<float>& qn0, std::vector<float>& qn1) const // NOLINT(readability-convert-member-functions-to-static)
     {
         auto zipped_data = utils::zip(qn0, qn1);
         std::for_each(std::execution::par, std::begin(zipped_data), std::end(zipped_data),
                       [delta_t](auto zipped_element) {
-                          std::get<1>(zipped_element) = std::get<0>(zipped_element) + delta_t * 9.81f;
+                          constexpr float gravityOfEarth = 9.81f;
+                          std::get<1>(zipped_element) = std::get<0>(zipped_element) + delta_t * gravityOfEarth;
                       });
     }
 
@@ -131,18 +132,19 @@ namespace wavy
 
     float FluidSolver1D::estimateAdvectionDeltaT() const
     {
+        constexpr float estimation_factor = 5.0f;
         auto maxu = std::reduce(std::execution::par, std::begin(m_u_n0), std::end(m_u_n0), 0.0f,
                                 [](float v0, float v1) { return std::max(v0, v1); });
-        auto umax = maxu + glm::sqrt(5.0f * m_delta_x * m_g);
-        return (5.0f * m_delta_x) / umax;
+        auto umax = maxu + glm::sqrt(estimation_factor * m_delta_x * m_g);
+        return (estimation_factor * m_delta_x) / umax;
     }
 
-    float FluidSolver1D::estimateBodyForcesDeltaT() const
+    float FluidSolver1D::estimateBodyForcesDeltaT() const // NOLINT(readability-convert-member-functions-to-static)
     {
         return 1.0f;
     }
 
-    float FluidSolver1D::estimateProjectDeltaT() const
+    float FluidSolver1D::estimateProjectDeltaT() const // NOLINT(readability-convert-member-functions-to-static)
     {
         return 1.0f;
     }
@@ -156,12 +158,12 @@ namespace wavy
                       [this, &u, &u_solid, scale](auto enum_element) {
                           auto index = std::get<0>(enum_element);
                           auto& result = std::get<1>(enum_element);
-                          if (m_labels[index] != FluidSolverBase::Label::FLUID) return;
+                          if (labels()[index] != FluidSolverBase::Label::FLUID) { return; }
                           result = -scale * (u[index + 1] - u[index]);
-                          if (m_labels[index - 1] == FluidSolverBase::Label::SOLID) {
+                          if (labels()[index - 1] == FluidSolverBase::Label::SOLID) {
                               result -= scale * (u[index] - u_solid(index));
                           }
-                          if (m_labels[index + 1] == FluidSolverBase::Label::SOLID) {
+                          if (labels()[index + 1] == FluidSolverBase::Label::SOLID) {
                               result += scale * (u[index + 1] - u_solid(index + 1));
                           }
                       });
@@ -179,12 +181,12 @@ namespace wavy
                           auto& A_x = std::get<1>(zipped_element);
                           A_diag = 0.0f;
                           A_x = 0.0f;
-                          if (m_labels[index] != FluidSolverBase::Label::FLUID) return;
-                          if (m_labels[index - 1] == FluidSolverBase::Label::FLUID) { A_diag += scale; }
-                          if (m_labels[index + 1] == FluidSolverBase::Label::FLUID) {
+                          if (labels()[index] != FluidSolverBase::Label::FLUID) { return; }
+                          if (labels()[index - 1] == FluidSolverBase::Label::FLUID) { A_diag += scale; }
+                          if (labels()[index + 1] == FluidSolverBase::Label::FLUID) {
                               A_diag += scale;
                               A_x = -scale;
-                          } else if (m_labels[index + 1] == FluidSolverBase::Label::EMPTY) {
+                          } else if (labels()[index + 1] == FluidSolverBase::Label::EMPTY) {
                               A_diag += scale;
                           }
                       });
@@ -202,11 +204,11 @@ namespace wavy
 
     float FluidSolver1D::interpolate(const utils::boundary_span<const float>& q, float x_P) const
     {
-        return FluidSolverBase::interpolate(q, x_P, m_delta_x);
+        return FluidSolverBase::Interpolate(q, x_P, m_delta_x);
     }
 
     float FluidSolver1D::integrate(const utils::boundary_span<const float>& f, float q, float delta_t) const
     {
-        return FluidSolverBase::integrate(f, q, delta_t, m_delta_x);
+        return FluidSolverBase::Integrate(f, q, delta_t, m_delta_x);
     }
 }

@@ -34,16 +34,16 @@ namespace mysh::core {
     struct has_contiguous_memory<std::array<T, N>> : std::true_type{};
 
     template<typename T>
-    struct has_contiguous_memory<T[]> : std::true_type{}; // NOLINT
+    struct has_contiguous_memory<T[]> : std::true_type{}; // NOLINT(cppcoreguidelines-avoid-c-arrays,hicpp-avoid-c-arrays,modernize-avoid-c-arrays)
 
     template<typename T, std::size_t N>
-    struct has_contiguous_memory<T[N]> : std::true_type{}; // NOLINT
+    struct has_contiguous_memory<T[N]> : std::true_type{}; // NOLINT(cppcoreguidelines-avoid-c-arrays,hicpp-avoid-c-arrays,modernize-avoid-c-arrays)
 
     template<typename T>
     struct has_contiguous_memory<aligned_vector<T>> : std::true_type {};
 
 
-    template<typename T> concept contiguous_memory = 
+    template<typename T> concept contiguous_memory =
         std::derived_from<has_contiguous_memory<T>, std::true_type>;
 
 

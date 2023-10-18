@@ -28,10 +28,11 @@ namespace wavy::utils
     using each expanded value to compare tuple value at that index. If any of
     the tuple elements are equal, the function will return true. */
     template<typename... Args, std::size_t... Index>
-    auto any_match_impl(std::tuple<Args...> const& lhs, std::tuple<Args...> const& rhs, std::index_sequence<Index...>)
+    auto any_match_impl(std::tuple<Args...> const& lhs, std::tuple<Args...> const& rhs,
+                        std::index_sequence<Index...> /*unused*/)
         -> bool
     {
-        return (... | (std::get<Index>(lhs) == std::get<Index>(rhs)));
+        return (... || (std::get<Index>(lhs) == std::get<Index>(rhs)));
     }
 
     /*  User function for finding any elementwise match in two tuples. Forwards to

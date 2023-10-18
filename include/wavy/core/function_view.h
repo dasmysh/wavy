@@ -23,40 +23,40 @@ namespace mysh::core {
     template<typename Fn> class function_view;
 
     /** @see \ref viscom::function_view< Fn > */
-    template<typename Ret, typename ...Params>
-    class function_view<Ret(Params...)> {
-        Ret(*callback)(intptr_t callable, Params ...params) = nullptr;
-        intptr_t callable;
+    template<typename Ret, typename ...Params> class function_view<Ret(Params...)>
+    {
+        Ret (*callback)(intptr_t callable, Params... params) = nullptr;
+        intptr_t callable = 0;
 
-        template<typename Callable>
-        static Ret callback_fn(intptr_t callable, Params ...params) {
-            return (*reinterpret_cast<Callable*>(callable))(
+        template<typename Callable> static Ret callback_fn(intptr_t callable, Params... params)
+        {
+            return (*reinterpret_cast<Callable*>(callable))( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
                 std::forward<Params>(params)...);
         }
 
     public:
         function_view() = default;
         /** Constructor for a function view with a nullptr. */
-        function_view(std::nullptr_t) {}
+        explicit function_view(std::nullptr_t) {}
 
         /**
          *  Constructor for function_view.
          *  @param callable the callable object to be wrapped by the \ref function_view.
          */
-        template <typename Callable>
-        function_view(Callable &&callable,
-            typename std::enable_if<
-            !std::is_same<typename std::remove_reference<Callable>::type,
-            function_view>::value>::type * = nullptr)
-            : callback(callback_fn<typename std::remove_reference<Callable>::type>),
-            callable(reinterpret_cast<intptr_t>(&callable)) {}
-
-        /** Calls the function contained within the function view with parameters. */
-        Ret operator()(Params ...params) const {
-            return callback(callable, std::forward<Params>(params)...);
+        template<typename Callable>
+        explicit function_view(Callable&& callable,
+                               typename std::enable_if<!std::is_same<typename std::remove_reference<Callable>::type,
+                                                                     function_view>::value>::type* /*unused*/
+                               = nullptr)
+            : callback(callback_fn<typename std::remove_reference<Callable>::type>)
+            , callable(reinterpret_cast<intptr_t>(&callable)) // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+        {
         }
 
+        /** Calls the function contained within the function view with parameters. */
+        Ret operator()(Params... params) const { return callback(callable, std::forward<Params>(params)...); }
+
         /** Checks whether the function_view contains a function. */
-        operator bool() const { return callback; }
+        explicit operator bool() const { return callback; }
     };
 }

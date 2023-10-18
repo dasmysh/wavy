@@ -39,19 +39,23 @@ namespace wavy
             std::size_t grid_size,
             const std::function<Label(const std::span<Label>&, std::size_t)>& labels_handler);
 
-        float interpolateLinear(const utils::boundary_span<const float>& q, float alpha, std::size_t xi) const;
-        float interpolateCubic(const utils::boundary_span<const float>& q, float alpha, std::size_t xi) const;
-        float interpolate(const utils::boundary_span<const float>& q, float x_P, float delta_x) const;
+        [[nodiscard]] static float InterpolateLinear(const utils::boundary_span<const float>& q, float s, std::size_t xi);
+        [[nodiscard]] static float InterpolateCubic(const utils::boundary_span<const float>& q, float s, std::size_t xi);
+        [[nodiscard]] static float Interpolate(const utils::boundary_span<const float>& q, float x_P, float delta_x);
 
-        float integrateRG2(const utils::boundary_span<const float>& f, float q, float delta_t, float delta_x) const;
-        float integrateRG3(const utils::boundary_span<const float>& f, float q, float delta_t, float delta_x) const;
-        float integrateRG4(const utils::boundary_span<const float>& f, float q, float delta_t, float delta_x) const;
-        float integrate(const utils::boundary_span<const float>& f, float q, float delta_t, float delta_x) const;
+        [[nodiscard]] static float IntegrateRG2(const utils::boundary_span<const float>& f, float q, float delta_t, float delta_x);
+        [[nodiscard]] static float IntegrateRG3(const utils::boundary_span<const float>& f, float q, float delta_t, float delta_x);
+        [[nodiscard]] static float IntegrateRG4(const utils::boundary_span<const float>& f, float q, float delta_t, float delta_x);
+        [[nodiscard]] static float Integrate(const utils::boundary_span<const float>& f, float q, float delta_t, float delta_x);
 
-        std::vector<Label> m_labels_data;
-        utils::boundary_span<Label> m_labels;
+        [[nodiscard]] const std::vector<Label>& labels_data() const { return m_labels_data; }
+        [[nodiscard]] std::vector<Label>& labels_data() { return m_labels_data; }
+        [[nodiscard]] const utils::boundary_span<Label>& labels() const { return m_labels; }
+        [[nodiscard]] utils::boundary_span<Label>& labels() { return m_labels; }
 
     private:
+        std::vector<Label> m_labels_data;
+        utils::boundary_span<Label> m_labels;
 
     };
 }

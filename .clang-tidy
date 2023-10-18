@@ -1,5 +1,5 @@
 ---
-Checks: '*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type,-llvm-*,-readability-named-parameter,-cppcoreguidelines-pro-type-union-access,-llvmlibc-*,-altera-*'
+Checks: '*,-fuchsia-*,-google-*,-zircon-*,-abseil-*,-modernize-use-trailing-return-type,-llvm-*,-readability-named-parameter,-readability-identifier-length,-cppcoreguidelines-pro-type-union-access,-llvmlibc-*,-altera-*'
 WarningsAsErrors: '1'
 HeaderFilterRegex: '.*'
 FormatStyle:     none

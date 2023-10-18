@@ -13,8 +13,8 @@ namespace wavy::utils
     protected:
         zip_fixture()
         {
-            v0.resize(50);
-            v1.resize(50);
+            v0.resize(vector0_size);
+            v1.resize(vector1_size);
             std::iota(std::begin(v0), std::end(v0), 0);
             std::iota(std::begin(v1), std::end(v1), 10);
         }
@@ -22,7 +22,12 @@ namespace wavy::utils
         auto zip_v() { return zip(v0, v1); }
         auto zip_nested_v() { return zip(enumerate(v0), v1); }
 
+        constexpr static std::size_t test_constant = 30;
+
     private:
+        constexpr static std::size_t vector0_size = 50;
+        constexpr static std::size_t vector1_size = 60;
+
         std::vector<std::size_t> v0;
         std::vector<std::size_t> v1;
     };
@@ -56,14 +61,15 @@ namespace wavy::utils
 
     TEST_CASE_METHOD(zip_fixture, "wavy::utils.zip.copy and move constructors", "[zip][range_based_for]")
     {
+        constexpr std::size_t test_constant2 = 99;
         auto zipper = zip_v();
         for (auto zipper2{zipper}; auto [value0, value1] : zipper2) {
             REQUIRE(value0 + 10 == value1);
-            value1 = value0 + 99;
+            value1 = value0 + test_constant2;
         }
 
         for (auto zipper3{std::move(zipper)}; const auto& [value0, value1] : zipper3) {
-            REQUIRE(value0 + 99 == value1);
+            REQUIRE(value0 + test_constant2 == value1);
         }
     }
 
@@ -95,11 +101,11 @@ namespace wavy::utils
             REQUIRE(index == std::get<1>(value0));
             REQUIRE(index + 10 == value1);
 
-            std::get<1>(value0) = index * 30;
+            std::get<1>(value0) = index * test_constant;
         }
 
         for (const auto& [value0, value1] : zip_nested_v()) {
-            REQUIRE(std::get<0>(value0) * 30 == std::get<1>(value0));
+            REQUIRE(std::get<0>(value0) * test_constant == std::get<1>(value0));
         }
     }
 
@@ -109,24 +115,24 @@ namespace wavy::utils
         {
             auto zipper = zip_nested_v();
             std::for_each(std::execution::par, std::begin(zipper), std::end(zipper), [](auto v_element) {
-                std::size_t index = std::get<0>(std::get<0>(v_element));
+                const std::size_t index = std::get<0>(std::get<0>(v_element));
                 auto& value0 = std::get<1>(std::get<0>(v_element));
                 auto& value1 = std::get<1>(v_element);
 
                 REQUIRE(index == value0);
                 REQUIRE(index + 10 == value1);
 
-                value1 = index * 30;
+                value1 = index * test_constant;
             });
         }
 
         {
             auto zipper = zip_nested_v();
             std::for_each(std::execution::par, std::begin(zipper), std::end(zipper), [](auto v_element) {
-                std::size_t index = std::get<0>(std::get<0>(v_element));
+                const std::size_t index = std::get<0>(std::get<0>(v_element));
                 auto& value1 = std::get<1>(v_element);
 
-                REQUIRE(index * 30 == value1);
+                REQUIRE(index * test_constant == value1);
             });
         }
     }
