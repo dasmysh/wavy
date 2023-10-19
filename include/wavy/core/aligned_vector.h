@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <bit>
 #include <vector>
 #include <cstdint>
 
@@ -29,11 +30,11 @@ namespace mysh::core {
         // template<class InputIt> aligned_vector(size_type alignedSize, InputIt first, InputIt last);
         aligned_vector(size_type alignedSize, std::initializer_list<T> init);
         aligned_vector(const aligned_vector& rhs) : m_alignedSize{rhs.m_alignedSize}, m_cont{rhs.m_cont} {}
-        aligned_vector& operator=(const aligned_vector&);
+        aligned_vector& operator=(const aligned_vector& /*rhs*/);
         aligned_vector(aligned_vector&& rhs) noexcept : m_alignedSize{rhs.m_alignedSize}, m_cont{std::move(rhs.m_cont)}
         {
         }
-        aligned_vector& operator=(aligned_vector&&) noexcept;
+        aligned_vector& operator=(aligned_vector&& /*rhs*/) noexcept;
         ~aligned_vector();
 
         /*aligned_vector& operator=(std::initializer_list<T> ilist);
@@ -42,19 +43,28 @@ namespace mysh::core {
         template<class InputIt> void assign(size_type alignment, InputIt first, InputIt last);
         void assign(std::initializer_list<T> init);*/
 
-        reference at(size_type pos) { return *reinterpret_cast<T*>(&m_cont.at(pos * m_alignedSize)); }
-        const_reference at(size_type pos) const { return *reinterpret_cast<const T*>(&m_cont.at(pos * m_alignedSize)); }
-        reference operator[](size_type pos) { return *reinterpret_cast<T*>(&m_cont[pos * m_alignedSize]); }
-        const_reference operator[](size_type pos) const
+        [[nodiscard]] reference at(size_type pos)
         {
-            return *reinterpret_cast<const T*>(&m_cont[pos * m_alignedSize]);
+            return *std::bit_cast<T*>(&m_cont.at(pos * m_alignedSize));
         }
-        reference front() { return *reinterpret_cast<T*>(&m_cont.front()); }
-        const_reference front() const { return *reinterpret_cast<const T*>(&m_cont.front()); }
-        reference back() { return *reinterpret_cast<T*>(&m_cont[m_cont.size() - m_alignedSize]); }
-        const_reference back() const { return *reinterpret_cast<const T*>(&m_cont[m_cont.size() - m_alignedSize]); }
-        T* data() noexcept { return reinterpret_cast<T*>(m_cont.data()); }
-        const T* data() const noexcept { return reinterpret_cast<const T*>(m_cont.data()); }
+        [[nodiscard]] const_reference at(size_type pos) const
+        {
+            return *std::bit_cast<const T*>(&m_cont.at(pos * m_alignedSize));
+        }
+        [[nodiscard]] reference operator[](size_type pos) { return *std::bit_cast<T*>(&m_cont[pos * m_alignedSize]); }
+        [[nodiscard]] const_reference operator[](size_type pos) const
+        {
+            return *std::bit_cast<const T*>(&m_cont[pos * m_alignedSize]);
+        }
+        [[nodiscard]] reference front() { return *std::bit_cast<T*>(&m_cont.front()); }
+        [[nodiscard]] const_reference front() const { return *std::bit_cast<const T*>(&m_cont.front()); }
+        [[nodiscard]] reference back() { return *std::bit_cast<T*>(&m_cont[m_cont.size() - m_alignedSize]); }
+        [[nodiscard]] const_reference back() const
+        {
+            return *std::bit_cast<const T*>(&m_cont[m_cont.size() - m_alignedSize]);
+        }
+        [[nodiscard]] T* data() noexcept { return std::bit_cast<T*>(m_cont.data()); }
+        [[nodiscard]] const T* data() const noexcept { return std::bit_cast<const T*>(m_cont.data()); }
 
         /*iterator begin() noexcept;
         const_iterator begin() const noexcept;
@@ -97,7 +107,7 @@ namespace mysh::core {
 
     private:
         /** Holds the vectors alignment. */
-        std::size_t m_alignedSize;
+        std::size_t m_alignedSize{};
         /** Holds the internal byte vector. */
         std::vector<std::uint8_t> m_cont;
     };
@@ -106,7 +116,7 @@ namespace mysh::core {
     inline aligned_vector<T>::aligned_vector(size_type alignedSize, size_type count, const T& value) :
         aligned_vector{ alignedSize, count }
     {
-        for (size_type i = 0U; i < count; ++i) { new (reinterpret_cast<T*>(m_cont[i * m_alignedSize])) T(value); }
+        for (size_type i = 0U; i < count; ++i) { new (std::bit_cast<T*>(&m_cont[i * m_alignedSize])) T(value); }
     }
 
     template<typename T>
@@ -115,13 +125,13 @@ namespace mysh::core {
     {
         size_type i = 0U;
         for (const auto& elem : init) {
-            new(reinterpret_cast<T*>(m_cont[i * m_alignedSize])) T(elem);
+            new (std::bit_cast<T*>(m_cont[i * m_alignedSize])) T(elem);
             i += 1;
         }
     }
 
     template<typename T>
-    inline aligned_vector<T>& aligned_vector<T>::operator=(const aligned_vector<T>& rhs) // NOLINT
+    inline aligned_vector<T>& aligned_vector<T>::operator=(const aligned_vector<T>& rhs)
     {
         if (this != &rhs) {
             m_alignedSize = rhs.m_alignedSize;
@@ -141,7 +151,10 @@ namespace mysh::core {
     template<typename T>
     inline aligned_vector<T>::~aligned_vector()
     {
-        for (size_type i = 0; i < m_cont.size(); i += m_alignedSize) reinterpret_cast<T*>(&m_cont[i])->~T();
+        for (size_type i = 0; i < m_cont.size(); i += m_alignedSize) {
+            auto* element_ptr = std::bit_cast<T*>(&m_cont[i]);
+            element_ptr->~T();
+        }
     }
 
     template<typename T>
@@ -149,7 +162,7 @@ namespace mysh::core {
     {
         auto oldSize = m_cont.size();
         m_cont.resize(oldSize + m_alignedSize);
-        new (reinterpret_cast<T*>(m_cont.data() + oldSize)) T(value);
+        new (std::bit_cast<T*>(m_cont.data() + oldSize)) T(value); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     template<typename T>
@@ -157,7 +170,9 @@ namespace mysh::core {
     {
         auto oldSize = m_cont.size();
         m_cont.resize(oldSize + m_alignedSize);
-        new (reinterpret_cast<T*>(m_cont.data() + oldSize)) T(std::move(value));
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        new (std::bit_cast<T*>(m_cont.data() + oldSize))T(std::move(value));
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     }
 
     template<typename T>
@@ -166,7 +181,9 @@ namespace mysh::core {
     {
         auto oldSize = m_cont.size();
         m_cont.resize(oldSize + m_alignedSize);
-        new (reinterpret_cast<T*>(m_cont.data() + oldSize)) T(std::forward<Args>(args)...);
+        // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+        new (std::bit_cast<T*>(m_cont.data() + oldSize)) T(std::forward<Args>(args)...);
+        // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
         return back();
     }
@@ -174,7 +191,8 @@ namespace mysh::core {
     template<typename T>
     inline void aligned_vector<T>::pop_back()
     {
-        for (auto i = 0U; i < m_alignedSize; ++i) m_cont.pop_back();
+        back()->~T();
+        for (auto i = 0U; i < m_alignedSize; ++i) { m_cont.pop_back(); }
     }
 
     template<typename T>
@@ -184,7 +202,9 @@ namespace mysh::core {
         m_cont.resize(count * m_alignedSize);
         for (auto i = oldElems; i < count; ++i) {
             auto newElemPos = (oldElems + i) * m_alignedSize;
-            new (reinterpret_cast<T*>(m_cont.data() + newElemPos)) T(value);
+            // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+            new (std::bit_cast<T*>(m_cont.data() + newElemPos)) T(value);
+            // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         }
     }
 

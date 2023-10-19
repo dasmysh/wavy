@@ -30,8 +30,7 @@ namespace mysh::core {
 
         template<typename Callable> static Ret callback_fn(intptr_t callable, Params... params)
         {
-            return (*reinterpret_cast<Callable*>(callable))( // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-                std::forward<Params>(params)...);
+            return (*bit_cast<Callable*>(callable))(std::forward<Params>(params)...);
         }
 
     public:
@@ -49,7 +48,7 @@ namespace mysh::core {
                                                                      function_view>::value>::type* /*unused*/
                                = nullptr)
             : callback(callback_fn<typename std::remove_reference<Callable>::type>)
-            , callable(reinterpret_cast<intptr_t>(&callable)) // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+            , callable(bit_cast<intptr_t>(&callable))
         {
         }
 

@@ -10,31 +10,32 @@
 
 #include <type_traits>
 
-namespace mysh::core {
+namespace mysh::core
+{
+    template<typename Enum> struct EnableBitMaskOperators
+    {
+        static constexpr bool enable = false;
+    };
 
-    template<typename Enum> struct EnableBitMaskOperators { static constexpr bool enable = false; };
-    template<typename Enum, typename Enable = void> class EnumFlags;
+    template<typename Enum>
+    concept EnumWithEnabledBitMaskOperators = EnableBitMaskOperators<Enum>::enable;
 
-    template<typename Enum> class EnumFlags<Enum, typename std::enable_if<EnableBitMaskOperators<Enum>::enable>::type>
+    template<EnumWithEnabledBitMaskOperators Enum>
+    class EnumFlags
     {
     public:
-        using base_type = typename std::underlying_type<Enum>::type;
+        using base_type = typename std::underlying_type_t<Enum>;
 
         EnumFlags() : m_mask(static_cast<base_type>(0)) {}
-        EnumFlags(Enum bit) : m_mask(static_cast<base_type>(bit)) {} // NOLINT
-        EnumFlags(base_type flags) : m_mask{flags} {} // NOLINT
-        EnumFlags(const EnumFlags&) = default;
-        EnumFlags(EnumFlags&&) noexcept = default;
-        EnumFlags& operator=(const EnumFlags&) = default;
-        EnumFlags& operator=(EnumFlags&&) noexcept = default;
-        ~EnumFlags() = default;
+        EnumFlags(Enum bit) : m_mask(static_cast<base_type>(bit)) {} // NOLINT(hicpp-explicit-conversions)
+        EnumFlags(base_type flags) : m_mask{flags} {} // NOLINT(hicpp-explicit-conversions)
 
-        EnumFlags<Enum>& operator|=(const EnumFlags<Enum>& rhs) { m_mask |= rhs.m_mask; return *this; } // NOLINT(hicpp-signed-bitwise)
-        EnumFlags<Enum>& operator&=(const EnumFlags<Enum>& rhs) { m_mask &= rhs.m_mask; return *this; } // NOLINT(hicpp-signed-bitwise)
-        EnumFlags<Enum>& operator^=(const EnumFlags<Enum>& rhs) { m_mask ^= rhs.m_mask; return *this; } // NOLINT(hicpp-signed-bitwise)
-        EnumFlags<Enum> operator|(const EnumFlags<Enum>& rhs) const { EnumFlags<Enum> result(*this); result |= rhs; return result; } // NOLINT(hicpp-signed-bitwise)
-        EnumFlags<Enum> operator&(const EnumFlags<Enum>& rhs) const { EnumFlags<Enum> result(*this); result &= rhs; return result; } // NOLINT(hicpp-signed-bitwise)
-        EnumFlags<Enum> operator^(const EnumFlags<Enum>& rhs) const { EnumFlags<Enum> result(*this); result ^= rhs; return result; } // NOLINT(hicpp-signed-bitwise)
+        EnumFlags<Enum>& operator|=(const EnumFlags<Enum>& rhs) { m_mask |= rhs.m_mask; return *this; }
+        EnumFlags<Enum>& operator&=(const EnumFlags<Enum>& rhs) { m_mask &= rhs.m_mask; return *this; }
+        EnumFlags<Enum>& operator^=(const EnumFlags<Enum>& rhs) { m_mask ^= rhs.m_mask; return *this; }
+        EnumFlags<Enum> operator|(const EnumFlags<Enum>& rhs) const { EnumFlags<Enum> result(*this); result |= rhs; return result; }
+        EnumFlags<Enum> operator&(const EnumFlags<Enum>& rhs) const { EnumFlags<Enum> result(*this); result &= rhs; return result; }
+        EnumFlags<Enum> operator^(const EnumFlags<Enum>& rhs) const { EnumFlags<Enum> result(*this); result ^= rhs; return result; }
         bool operator!() const { return !m_mask; }
         EnumFlags<Enum> operator~() const { return ~m_mask; }
         bool operator==(const EnumFlags<Enum>& rhs) const { return m_mask == rhs.m_mask; }

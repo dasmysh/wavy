@@ -1,3 +1,11 @@
+/**
+ * @file   test_zip.cpp
+ * @author Sebastian Maisch <sebastian.maisch@googlemail.com>
+ * @date   2023.10.15
+ *
+ * @brief  Tests for the zip function.
+ */
+
 #include "utils/enumerate.h"
 #include "utils/zip.h"
 
