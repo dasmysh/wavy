@@ -82,13 +82,6 @@ namespace wavy
             advect(delta_t, m_u_n0, m_u_A);
             bodyForces(delta_t, m_u_A, m_u_B);
             // project(deltaT, m_u_B, m_un1);
-
-            // auto enumerator = utils::enumerate(m_indices_data);
-            // std::for_each(std::execution::par, std::begin(enumerator), std::end(enumerator), []([[maybe_unused]] const auto& v) {});
-            // auto zipper = utils::zip(m_indices_data, m_p, m_u_A);
-            // auto zipper2 = zipper;
-            // std::for_each(std::execution::par, std::begin(zipper), std::end(zipper),
-            //               []([[maybe_unused]] const auto& v) {});
         }
     }
 
@@ -128,6 +121,7 @@ namespace wavy
                                 mysh::core::function_view<float(std::size_t idx)> u_solid)
     {
         presure_gradient_rhs(qn0, m_rhs, u_solid);
+        setup_A(delta_t);
     }
 
     float FluidSolver1D::estimateAdvectionDeltaT() const
