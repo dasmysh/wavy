@@ -10,8 +10,10 @@
 #include "utils/enumerate.h"
 #include "utils/zip.h"
 
+#include <eigen3/Eigen/Core>
 #include <glm/glm.hpp>
 #include <glm/ext/scalar_common.hpp>
+#include <spdlog/spdlog.h>
 #include <numeric>
 #include <execution>
 #include <ranges>
@@ -63,6 +65,12 @@ namespace wavy
         , m_rhs(grid_size, 0.0f)
         , m_A_diag(grid_size, 0.0f)
         , m_A_x(grid_size, 0.0f)
+        , m_precon(grid_size, 0.0f)
+        , m_b(grid_size, 0.0f)
+        , m_r(grid_size, 0.0f)
+        , m_q(grid_size, 0.0f)
+        , m_z(grid_size, 0.0f)
+        , m_s(grid_size, 0.0f)
     {
         std::iota(std::begin(m_position), std::end(m_position), detail::iota_step<float>(0.0f, m_delta_x));
     }
@@ -122,6 +130,9 @@ namespace wavy
     {
         presure_gradient_rhs(qn0, m_rhs, u_solid);
         setup_A(delta_t);
+        // TODO: construct preconditioner
+        // TODO: solve Ap=b
+        // TODO: compute new velocities u^n+1
     }
 
     float FluidSolver1D::estimateAdvectionDeltaT() const
@@ -152,12 +163,12 @@ namespace wavy
                       [this, &u, &u_solid, scale](auto enum_element) {
                           auto index = std::get<0>(enum_element);
                           auto& result = std::get<1>(enum_element);
-                          if (labels()[index] != FluidSolverBase::Label::FLUID) { return; }
+                          if (labels()[index] != Label::FLUID) { return; }
                           result = -scale * (u[index + 1] - u[index]);
-                          if (labels()[index - 1] == FluidSolverBase::Label::SOLID) {
+                          if (labels()[index - 1] == Label::SOLID) {
                               result -= scale * (u[index] - u_solid(index));
                           }
-                          if (labels()[index + 1] == FluidSolverBase::Label::SOLID) {
+                          if (labels()[index + 1] == Label::SOLID) {
                               result += scale * (u[index + 1] - u_solid(index + 1));
                           }
                       });
@@ -175,14 +186,102 @@ namespace wavy
                           auto& A_x = std::get<1>(zipped_element);
                           A_diag = 0.0f;
                           A_x = 0.0f;
-                          if (labels()[index] != FluidSolverBase::Label::FLUID) { return; }
-                          if (labels()[index - 1] == FluidSolverBase::Label::FLUID) { A_diag += scale; }
-                          if (labels()[index + 1] == FluidSolverBase::Label::FLUID) {
+                          if (labels()[index] != Label::FLUID) { return; }
+                          if (labels()[index - 1] == Label::FLUID) { A_diag += scale; }
+                          if (labels()[index + 1] == Label::FLUID) {
                               A_diag += scale;
                               A_x = -scale;
-                          } else if (labels()[index + 1] == FluidSolverBase::Label::EMPTY) {
+                          } else if (labels()[index + 1] == Label::EMPTY) {
                               A_diag += scale;
                           }
+                      });
+    }
+
+    void FluidSolver1D::incomplete_cholesky(const std::vector<float>& A_diag, const std::vector<float>& A_x,
+                                            std::vector<float>& precon) const
+    {
+        // constexpr float tau = 0.97f; unused for 1D case
+        constexpr float sigma = 0.25f;
+        for (std::size_t i = 0; i < A_diag.size(); ++i) {
+            if (labels()[i] != Label::FLUID) continue;
+            auto e_root = 0.0f;
+            if (i > 0) e_root = (A_x[i - 1] * precon[i - 1]);
+            auto e = A_diag[i] - e_root * e_root;
+            if (e < sigma * A_diag[i]) e = A_diag[i];
+
+            precon[i] = 1.0f / glm::sqrt(e);
+        }
+    }
+
+    void FluidSolver1D::preconditioned_conjugate_gradient()
+    {
+        std::fill(std::begin(m_p), std::end(m_p), 0.0f);
+        if (std::all_of(std::begin(m_b), std::end(m_b), [](auto v) { return v == 0.0f; })) { return; }
+        m_r = m_b;
+        apply_preconditioner(m_A_x, m_precon, m_r, m_z, m_q);
+
+        Eigen::Map<Eigen::VectorXf> ez{m_z.data(), static_cast<Eigen::Index>(m_z.size())};
+        Eigen::Map<Eigen::VectorXf> er{m_r.data(), static_cast<Eigen::Index>(m_r.size())};
+        Eigen::Map<Eigen::VectorXf> es{m_s.data(), static_cast<Eigen::Index>(m_s.size())};
+        Eigen::Map<Eigen::VectorXf> ep{m_p.data(), static_cast<Eigen::Index>(m_p.size())};
+
+        float sigma = ez.dot(er);
+
+        constexpr int max_iterations = 10;
+        constexpr float tol = 1.e-6f;
+        for (int i = 0; i < max_iterations; ++i) {
+            apply_A(m_A_diag, m_A_x, m_s, m_z);
+            auto alpha = sigma / ez.dot(es);
+            ep += alpha * es;
+            er -= alpha * ez;
+            if (er.maxCoeff() <= tol) { return; }
+            apply_preconditioner(m_A_x, m_precon, m_r, m_z, m_q);
+            auto sigma_new = ez.dot(er);
+            auto beta = sigma_new / sigma;
+            es = ez + beta * es;
+            sigma = sigma_new;
+        }
+
+        spdlog::debug("PCG stopped after {} iterations.", max_iterations);
+    }
+
+    void FluidSolver1D::apply_preconditioner(const std::vector<float>& A_x, const std::vector<float>& precon,
+                                             const std::vector<float>& r, std::vector<float>& z,
+                                             std::vector<float>& q) const
+    {
+        for (std::size_t i = 0; i < A_x.size(); ++i) {
+            if (labels()[i] != Label::FLUID) continue;
+            if (i == 0) {
+                q[i] = 0.0f;
+                continue;
+            }
+
+            auto t = r[i] - A_x[i - 1] * precon[i - 1] * q[i - 1];
+            q[i] = t * precon[i];
+        }
+
+        for (std::size_t i = 0; i < A_x.size(); ++i) {
+            if (labels()[i] != Label::FLUID) continue;
+            auto t = q[i] - A_x[i] * precon[i] * z[i + 1];
+            z[i] = t * precon[i];
+        }
+    }
+
+    void FluidSolver1D::apply_A(const std::vector<float>& A_diag, const std::vector<float>& A_x, const std::vector<float>& s,
+                                std::vector<float>& z) const
+    {
+
+        auto enumerated_data = utils::enumerate(utils::zip(A_diag, z));
+
+        std::for_each(std::execution::par, std::begin(enumerated_data), std::end(enumerated_data),
+                      [this, &A_x, &s](auto enum_element) {
+                          auto i = std::get<0>(enum_element);
+                          auto& A_ii = std::get<0>(std::get<1>(enum_element));
+                          auto& z_i = std::get<1>(std::get<1>(enum_element));
+
+                          z_i = A_ii * s[i];
+                          if (i > 0) { z_i += A_x[i - 1] * s[i - 1]; }
+                          if (i < s.size() - 1) { z_i += A_x[i + 1] * s[i + 1]; }
                       });
     }
 

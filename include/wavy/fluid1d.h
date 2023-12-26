@@ -35,6 +35,13 @@ namespace wavy
 
         void presure_gradient_rhs(const std::vector<float>& u, std::vector<float>& rhs, mysh::core::function_view<float(std::size_t idx)> u_solid) const;
         void setup_A(float delta_t);
+        void incomplete_cholesky(const std::vector<float>& A_diag, const std::vector<float>& A_x, std::vector<float>& precon) const;
+        void preconditioned_conjugate_gradient();
+        void apply_preconditioner(const std::vector<float>& A_x, const std::vector<float>& precon,
+                                  const std::vector<float>& r, std::vector<float>& z, std::vector<float>& q) const;
+        void apply_A(const std::vector<float>& A_diag, const std::vector<float>& A_x, const std::vector<float>& s,
+                                std::vector<float>& z) const;
+        void presure_gradient_update();
 
         [[nodiscard]] float toPosition(std::size_t index) const;
         [[nodiscard]] std::size_t toGrid(float position) const;
@@ -60,5 +67,12 @@ namespace wavy
         std::vector<float> m_rhs;
         std::vector<float> m_A_diag;
         std::vector<float> m_A_x;
+        std::vector<float> m_precon;
+
+        std::vector<float> m_b;
+        std::vector<float> m_r;
+        std::vector<float> m_q;
+        std::vector<float> m_z;
+        std::vector<float> m_s;
     };
 }
