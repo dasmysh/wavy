@@ -28,8 +28,7 @@ file(GLOB TOP_FILES CONFIGURE_DEPENDS
 source_group(" " FILES ${TOP_FILES})
 
 add_library(${APPLICATION_NAME}_lib OBJECT ${SRC_FILES} ${INCLUDE_FILES} ${EXTERN_SOURCES} ${TOP_FILES})
-target_link_libraries(${APPLICATION_NAME}_lib PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings fmt::fmt spdlog::spdlog cereal::cereal Eigen3::Eigen glm::glm imgui::imgui)
-target_link_libraries(${APPLICATION_NAME}_lib PRIVATE glfw)
+target_link_libraries(${APPLICATION_NAME}_lib PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings fmt::fmt spdlog::spdlog cereal::cereal Eigen3::Eigen glm::glm sfml-graphics ImGui-SFML::ImGui-SFML)
 target_include_directories(${APPLICATION_NAME}_lib PUBLIC
     ${PROJECT_SOURCE_DIR}/include/${PROJECT_REL_PATH}
     ${CMAKE_CURRENT_SOURCE_DIR})
@@ -38,8 +37,7 @@ set_target_properties(${APPLICATION_NAME}_lib PROPERTIES FOLDER "${APPLICATION_N
 
 
 add_executable(${APPLICATION_NAME} ${TOP_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
-target_link_libraries(${APPLICATION_NAME} PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings $<TARGET_OBJECTS:${APPLICATION_NAME}_lib> fmt::fmt spdlog::spdlog cereal::cereal glm::glm imgui::imgui)
-target_link_libraries(${APPLICATION_NAME} PRIVATE glfw)
+target_link_libraries(${APPLICATION_NAME} PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings $<TARGET_OBJECTS:${APPLICATION_NAME}_lib> fmt::fmt spdlog::spdlog cereal::cereal glm::glm sfml-system sfml-window sfml-graphics ImGui-SFML::ImGui-SFML)
 target_include_directories(${APPLICATION_NAME} PUBLIC
     ${PROJECT_SOURCE_DIR}/include/${PROJECT_REL_PATH}
     ${CMAKE_CURRENT_SOURCE_DIR})

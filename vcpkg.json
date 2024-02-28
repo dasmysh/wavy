@@ -10,7 +10,7 @@
     "cereal",
     "eigen3",
     "glm",
-    "glfw3",
-    "imgui"
+    "sfml",
+    "imgui-sfml"
   ]
 }
