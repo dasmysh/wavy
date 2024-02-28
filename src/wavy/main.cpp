@@ -58,7 +58,7 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
         spdlog::info("Log created.");
 
     } catch (const spdlog::spdlog_ex& ex) {
-        std::cerr << "Log initialization failed: " << ex.what() << std::endl;
+        std::cerr << "Log initialization failed: " << ex.what() << std::endl; // NOLINT(performance-avoid-endl)
         return 0;
     }
 

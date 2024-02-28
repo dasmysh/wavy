@@ -44,10 +44,10 @@ namespace mysh::core {
          */
         template<typename Callable>
         explicit function_view(Callable&& callable,
-                               typename std::enable_if<!std::is_same<typename std::remove_reference<Callable>::type,
-                                                                     function_view>::value>::type* /*unused*/
+                               typename std::enable_if_t<!std::is_same_v<typename std::remove_reference_t<Callable>,
+                                                                     function_view>>* /*unused*/
                                = nullptr)
-            : callback(callback_fn<typename std::remove_reference<Callable>::type>)
+            : callback(callback_fn<typename std::remove_reference_t<Callable>>)
             , callable(bit_cast<intptr_t>(&callable))
         {
         }
