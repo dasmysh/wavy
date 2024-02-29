@@ -9,7 +9,6 @@
 #pragma once
 
 #include <glm/vec2.hpp>
-#include <vector>
 
 namespace wavy::sph {
 
@@ -29,8 +28,12 @@ namespace wavy::sph {
 
 
         struct particle {
+            particle() = default;
+            explicit particle(const glm::vec2& p) : position{p} {}
             glm::vec2 position = glm::vec2{0.f};
             glm::vec2 velocity = glm::vec2{0.f};
+            float density = 0.f;
+            float property = 0.f;
         };
 
         void simulation_step(float delta_t);
@@ -45,20 +48,33 @@ namespace wavy::sph {
         float get_particle_radius() const { return m_particle_radius; }
         void set_particle_radius(float radius) { m_particle_radius = radius; }
 
+        float get_particle_mass() const { return m_particle_mass; }
+        void set_particle_mass(float mass) { m_particle_mass = mass; }
+
         float get_gravity() const { return m_gravity; }
         void set_gravity(float gravity) { m_gravity = gravity; }
 
         float get_collision_dampening() const { return m_collision_dampening; }
         void set_collision_dampening(float collision_dampening) { m_collision_dampening = collision_dampening; }
 
+        // public for visualization.
+        float density_kernel(float r) const;
+        float property_kernel(float r) const;
+        float calculate_density(const glm::vec2& p) const;
+        float calculate_property(const glm::vec2& p) const;
+
     private:
         void simulate_gravity(float delta_t);
         void resolve_collisions();
+        void update_densities();
+
+        static float calc_property(const glm::vec2& p);
 
         glm::vec2 m_simulation_area;
         std::vector<particle> m_particles;
         particle_pattern m_pattern;
         float m_particle_radius = 20.f;
+        float m_particle_mass = 1.f;
 
         float m_gravity = 0.f;// 9.81f;
         float m_collision_dampening = .1f;
