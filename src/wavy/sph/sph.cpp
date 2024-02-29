@@ -11,6 +11,7 @@
 
 #include "imgui.h"
 #include <SFML/Graphics.hpp>
+#include <glm/common.hpp>
 #include <array>
 
 namespace wavy::sph {
@@ -22,8 +23,13 @@ namespace wavy::sph {
 
     sph::~sph() = default;
 
+    void sph::simulation_frame(float delta_t)
     {
+        float delta_t_step = delta_t / static_cast<float>(m_sim_steps_per_frame);
+        for (int i = 0; i < m_sim_steps_per_frame; ++i) {
+            m_solver->simulation_step(delta_t_step * m_sim_time_scale);
         }
+    }
 
     void wavy::sph::sph::draw_gui()
     {

@@ -97,6 +97,8 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
 
         ImGui::SFML::Update(window, deltaClock.restart());
 
+        sph_manager.simulation_frame(deltaClock.getElapsedTime().asSeconds());
+
         // ImGui::ShowDemoWindow();
 
         // clear the window with black color

@@ -26,6 +26,12 @@ namespace wavy::sph {
 
     sph_solver::~sph_solver() = default;
 
+    void sph_solver::simulation_step(float delta_t)
+    {
+        simulate_gravity(delta_t);
+        resolve_collisions();
+    }
+
     void sph_solver::set_particle_count(std::size_t particle_count)
     {
         m_particles.resize(particle_count);
@@ -61,5 +67,36 @@ namespace wavy::sph {
                     pos_offset + glm::vec2{x, y} * m_particle_radius;
                 });
         }
+    }
+
+    void sph_solver::simulate_gravity(float delta_t)
+    {
+        float delta_gravity = m_gravity * delta_t;
+        std::ranges::for_each(m_particles, [delta_gravity, delta_t](auto& particle) {
+            particle.velocity += glm::vec2{0.f, -1.f} * delta_gravity;
+            particle.position += -particle.velocity * delta_t;
+        });
+    }
+
+    void sph_solver::resolve_collisions()
+    {
+        std::ranges::for_each(m_particles, [this](auto& particle) {
+            if (particle.position.x < m_particle_radius) {
+                particle.position.x = m_particle_radius;
+                particle.velocity.x *= -1.f * m_collision_dampening;
+            }
+            if (particle.position.x > m_simulation_area.x - m_particle_radius) {
+                particle.position.x = m_simulation_area.x - m_particle_radius;
+                particle.velocity.x *= -1.f * m_collision_dampening;
+            }
+            if (particle.position.y < m_particle_radius) {
+                particle.position.y = m_particle_radius;
+                particle.velocity.y *= -1.f * m_collision_dampening;
+            }
+            if (particle.position.y > m_simulation_area.y - m_particle_radius) {
+                particle.position.y = m_simulation_area.y - m_particle_radius;
+                particle.velocity.y *= -1.f * m_collision_dampening;
+            }
+        });
     }
 }

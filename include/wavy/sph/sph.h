@@ -25,7 +25,7 @@ namespace wavy::sph {
         explicit sph(const glm::vec2& sim_area);
         ~sph();
 
-        void draw(sf::RenderTarget& rt);
+        void simulation_frame(float delta_t);
 
         void draw_gui();
         void draw_simulation(sf::RenderTarget& rt) const;

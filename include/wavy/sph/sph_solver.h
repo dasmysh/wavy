@@ -30,7 +30,10 @@ namespace wavy::sph {
 
         struct particle {
             glm::vec2 position;
+            glm::vec2 velocity;
         };
+
+        void simulation_step(float delta_t);
 
         void set_particle_count(std::size_t particle_count);
         void set_particle_pattern(particle_pattern pattern);
