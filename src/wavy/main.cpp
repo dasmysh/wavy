@@ -76,10 +76,11 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
     sf::RenderWindow window(sf::VideoMode(window_width, window_height), "wavy", sf::Style::Default, settings);
     window.setFramerateLimit(60);
     ImGui::SFML::Init(window);
-    sf::Clock deltaClock;
 
     spdlog::debug("Starting main loop.");
     wavy::sph::sph sph_manager{glm::vec2{ 1920.0f, 1080.0f }};
+
+    sf::Clock deltaClock;
     while (window.isOpen()) {
         // check all the window's events that were triggered since the last iteration of the loop
         sf::Event event;

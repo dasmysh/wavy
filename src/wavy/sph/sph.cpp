@@ -10,8 +10,8 @@
 #include "sph/sph_solver.h"
 
 #include "imgui.h"
-#include <SFML/Graphics.hpp>
 #include <glm/common.hpp>
+#include <spdlog/spdlog.h>
 #include <array>
 
 namespace wavy::sph {
@@ -19,12 +19,21 @@ namespace wavy::sph {
     sph::sph(const glm::vec2& sim_area)
         : m_sim_area{ sim_area }
         , m_solver{std::make_unique<sph_solver>(sim_area)}
-    {}
+    {
+        auto font_file = "../assets/monaspace/MonaspaceNeonVarVF[wght,wdth,slnt].ttf";
+        if (!m_delta_t_font.loadFromFile(font_file)) { spdlog::error("Could not load font: {}", font_file); }
+
+
+    }
 
     sph::~sph() = default;
 
     void sph::simulation_frame(float delta_t)
     {
+        m_delta_t_out_of_bounds = false;
+        if (delta_t > 1.5f * m_last_delta_t || delta_t < 0.5f * m_last_delta_t) { m_delta_t_out_of_bounds = true; }
+        m_last_delta_t = glm::mix(m_last_delta_t, delta_t, .6f);
+
         float delta_t_step = delta_t / static_cast<float>(m_sim_steps_per_frame);
         for (int i = 0; i < m_sim_steps_per_frame; ++i) {
             m_solver->simulation_step(delta_t_step * m_sim_time_scale);
@@ -110,6 +119,11 @@ namespace wavy::sph {
             particleShape.setPosition(render_position.x, render_position.y);
             rt.draw(particleShape);
         }
+
+        sf::Text delta_t_text(fmt::format("{:.5f}", m_last_delta_t), m_delta_t_font);
+        delta_t_text.setFillColor(m_delta_t_out_of_bounds ? sf::Color::Red : sf::Color::Green);
+        delta_t_text.setOutlineColor(m_delta_t_out_of_bounds ? sf::Color::Red : sf::Color::Green);
+        rt.draw(delta_t_text);
     }
 
 }

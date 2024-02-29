@@ -8,12 +8,9 @@
 
 #pragma once
 
+#include <SFML/Graphics.hpp>
 #include <glm/vec2.hpp>
 #include <memory>
-
-namespace sf {
-    class RenderTarget;
-}
 
 namespace wavy::sph {
 
@@ -36,5 +33,10 @@ namespace wavy::sph {
         float m_visual_particle_radius = 5.f;
         float m_sim_time_scale = 300.f;
         int m_sim_steps_per_frame = 10;
+
+        float m_last_delta_t = 0.f;
+        bool m_delta_t_out_of_bounds = false;
+
+        sf::Font m_delta_t_font;
     };
 }
