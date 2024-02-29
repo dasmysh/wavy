@@ -53,18 +53,20 @@ namespace wavy::sph {
 
             std::ranges::for_each(m_particles, [&distr_x, &distr_y, &eng](auto& particle) {
                 particle.position = glm::vec2{distr_x(eng), distr_y(eng)};
+                particle.velocity = glm::vec2{0.f};
             });
         } else if (m_pattern == particle_pattern::centered_grid) {
             auto grid_width = glm::ceil(glm::sqrt(static_cast<float>(m_particles.size())));
-            auto pos_offset = .5f * m_simulation_area
-                              + glm::vec2{-.5f, .5f} * grid_width * m_particle_radius;
+            auto pos_offset = .5f * (m_simulation_area - grid_width * m_particle_radius);
 
             std::ranges::for_each(utils::enumerate(m_particles), [this, grid_width, &pos_offset](auto enum_particle) {
                 auto i = static_cast<float>(std::get<0>(enum_particle));
                 auto x = glm::mod(i, grid_width);
-                auto y = -glm::floor(i / grid_width) -.5f;
-                std::get<1>(enum_particle).position =
-                    pos_offset + glm::vec2{x, y} * m_particle_radius;
+                auto y = glm::floor((static_cast<float>(m_particles.size() - 1) - i) / grid_width) + .5f;
+
+                auto& particle = std::get<1>(enum_particle);
+                particle.position = pos_offset + glm::vec2{x, y} * m_particle_radius;
+                particle.velocity = glm::vec2{0.f};
                 });
         }
     }
@@ -74,7 +76,7 @@ namespace wavy::sph {
         float delta_gravity = m_gravity * delta_t;
         std::ranges::for_each(m_particles, [delta_gravity, delta_t](auto& particle) {
             particle.velocity += glm::vec2{0.f, -1.f} * delta_gravity;
-            particle.position += -particle.velocity * delta_t;
+            particle.position += particle.velocity * delta_t;
         });
     }
 
@@ -83,19 +85,19 @@ namespace wavy::sph {
         std::ranges::for_each(m_particles, [this](auto& particle) {
             if (particle.position.x < m_particle_radius) {
                 particle.position.x = m_particle_radius;
-                particle.velocity.x *= -1.f * m_collision_dampening;
+                particle.velocity.x *= -1.f * (1.f - m_collision_dampening);
             }
             if (particle.position.x > m_simulation_area.x - m_particle_radius) {
                 particle.position.x = m_simulation_area.x - m_particle_radius;
-                particle.velocity.x *= -1.f * m_collision_dampening;
+                particle.velocity.x *= -1.f * (1.f - m_collision_dampening);
             }
             if (particle.position.y < m_particle_radius) {
                 particle.position.y = m_particle_radius;
-                particle.velocity.y *= -1.f * m_collision_dampening;
+                particle.velocity.y *= -1.f * (1.f - m_collision_dampening);
             }
             if (particle.position.y > m_simulation_area.y - m_particle_radius) {
                 particle.position.y = m_simulation_area.y - m_particle_radius;
-                particle.velocity.y *= -1.f * m_collision_dampening;
+                particle.velocity.y *= -1.f * (1.f - m_collision_dampening);
             }
         });
     }

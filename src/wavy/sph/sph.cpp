@@ -67,12 +67,12 @@ namespace wavy::sph {
             ImGui::Separator();
 
             if (auto gravity = m_solver->get_gravity(); ImGui::SliderFloat("Gravity", &gravity, .0f, 100.f)) {
-                m_solver->set_particle_radius(gravity);
+                m_solver->set_gravity(gravity);
             }
 
             if (auto collision_dampening = m_solver->get_collision_dampening();
                 ImGui::SliderFloat("Collision Dampening", &collision_dampening, .0f, 1.f)) {
-                m_solver->set_particle_radius(collision_dampening);
+                m_solver->set_collision_dampening(collision_dampening);
             }
 
             ImGui::End();
@@ -81,10 +81,8 @@ namespace wavy::sph {
 
     void sph::draw_simulation(sf::RenderTarget& rt) const
     {
-        // TODO: flip the grid for simulation so that y is up
-
         auto rt_size = rt.getSize();
-        auto area_offset = glm::vec2{0.05f * static_cast<float>(rt_size.x), 0.05f * static_cast<float>(rt_size.y)};
+        auto area_offset = glm::vec2{0.05f * static_cast<float>(rt_size.x), 0.95f * static_cast<float>(rt_size.y)};
         auto area_size = glm::vec2{0.9f * static_cast<float>(rt_size.x), 0.9f * static_cast<float>(rt_size.y)};
 
         sf::RectangleShape line_top{sf::Vector2f(static_cast<float>(rt_size.x), static_cast<float>(rt_size.y) * 0.05f)};
@@ -108,7 +106,7 @@ namespace wavy::sph {
 
         for (const auto& particles = m_solver->get_particles(); const auto& particle : particles) {
             auto relative_position = particle.position / m_sim_area;
-            auto render_position = area_offset + relative_position * area_size;
+            auto render_position = area_offset + glm::vec2{1.f, -1.f} * relative_position * area_size;
             particleShape.setPosition(render_position.x, render_position.y);
             rt.draw(particleShape);
         }

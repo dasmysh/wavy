@@ -29,8 +29,8 @@ namespace wavy::sph {
 
 
         struct particle {
-            glm::vec2 position;
-            glm::vec2 velocity;
+            glm::vec2 position = glm::vec2{0.f};
+            glm::vec2 velocity = glm::vec2{0.f};
         };
 
         void simulation_step(float delta_t);
@@ -60,7 +60,7 @@ namespace wavy::sph {
         particle_pattern m_pattern;
         float m_particle_radius = 20.f;
 
-        float m_gravity = 9.81f;
-        float m_collision_dampening = .9f;
+        float m_gravity = 0.f;// 9.81f;
+        float m_collision_dampening = .1f;
     };
 }
