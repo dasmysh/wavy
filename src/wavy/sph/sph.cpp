@@ -22,8 +22,61 @@ namespace wavy::sph {
 
     sph::~sph() = default;
 
-    void wavy::sph::sph::draw(sf::RenderTarget& rt)
     {
+        }
+
+    void wavy::sph::sph::draw_gui()
+    {
+        if (ImGui::Begin("SPH Settings")) {
+
+            ImGui::SliderFloat("Visual Particle Radius", &m_visual_particle_radius, .001f, 100.f);
+            ImGui::SliderFloat("Simulation Time Scale", &m_sim_time_scale, .1f, 100000.f);
+            ImGui::InputInt("Simulation Steps per Frame", &m_sim_steps_per_frame);
+            m_sim_steps_per_frame = glm::max(1, m_sim_steps_per_frame);
+
+            ImGui::Separator();
+
+            if (auto particle_count = static_cast<int>(m_solver->get_particles().size());
+                ImGui::InputInt("Particle Count", &particle_count))
+            {
+                m_solver->set_particle_count(static_cast<std::size_t>(particle_count));
+            }
+
+            if (auto particle_radius = m_solver->get_particle_radius();
+                ImGui::SliderFloat("Particle Radius", &particle_radius, .001f, 100.f)) {
+                m_solver->set_particle_radius(particle_radius);
+            }
+
+            std::array<const char*, 2> pattern_names{"random", "centered_grid"};
+            if (auto current_pattern = static_cast<int>(m_solver->get_pattern());
+                ImGui::Combo("Pattern", &current_pattern, pattern_names.data(), static_cast<int>(pattern_names.size()))) {
+                m_solver->set_particle_pattern(static_cast<particle_pattern>(current_pattern));
+            }
+
+            static int seed = 1337;
+            if (m_solver->get_pattern() == particle_pattern::random) { ImGui::InputInt("Seed", &seed, 0); }
+
+            if (ImGui::Button("Reset Particles")) { m_solver->reset_particles(seed); }
+
+            ImGui::Separator();
+
+            if (auto gravity = m_solver->get_gravity(); ImGui::SliderFloat("Gravity", &gravity, .0f, 100.f)) {
+                m_solver->set_particle_radius(gravity);
+            }
+
+            if (auto collision_dampening = m_solver->get_collision_dampening();
+                ImGui::SliderFloat("Collision Dampening", &collision_dampening, .0f, 1.f)) {
+                m_solver->set_particle_radius(collision_dampening);
+            }
+
+            ImGui::End();
+        }
+    }
+
+    void sph::draw_simulation(sf::RenderTarget& rt) const
+    {
+        // TODO: flip the grid for simulation so that y is up
+
         auto rt_size = rt.getSize();
         auto area_offset = glm::vec2{0.05f * static_cast<float>(rt_size.x), 0.05f * static_cast<float>(rt_size.y)};
         auto area_size = glm::vec2{0.9f * static_cast<float>(rt_size.x), 0.9f * static_cast<float>(rt_size.y)};
@@ -52,35 +105,6 @@ namespace wavy::sph {
             auto render_position = area_offset + relative_position * area_size;
             particleShape.setPosition(render_position.x, render_position.y);
             rt.draw(particleShape);
-        }
-
-        if (ImGui::Begin("SPH Settings")) {
-
-            ImGui::SliderFloat("Visual Particle Radius", &m_visual_particle_radius, .001f, 100.f);
-
-            if (auto particle_count = static_cast<int>(m_solver->get_particles().size());
-                ImGui::InputInt("Particle Count", &particle_count))
-            {
-                m_solver->set_particle_count(static_cast<std::size_t>(particle_count));
-            }
-
-            if (auto particle_radius = m_solver->get_particle_radius();
-                ImGui::SliderFloat("Particle Radius", &particle_radius, .001f, 100.f)) {
-                m_solver->set_particle_radius(particle_radius);
-            }
-
-            std::array<const char*, 2> pattern_names{"random", "centered_grid"};
-            if (auto current_pattern = static_cast<int>(m_solver->get_pattern());
-                ImGui::Combo("Pattern", &current_pattern, pattern_names.data(), static_cast<int>(pattern_names.size()))) {
-                m_solver->set_particle_pattern(static_cast<particle_pattern>(current_pattern));
-            }
-
-            static int seed = 1337;
-            if (m_solver->get_pattern() == particle_pattern::random) { ImGui::InputInt("Seed", &seed, 0); }
-
-            if (ImGui::Button("Reset Particles")) { m_solver->reset_particles(seed); }
-
-            ImGui::End();
         }
     }
 

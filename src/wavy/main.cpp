@@ -101,7 +101,8 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
 
         // clear the window with black color
         window.clear(sf::Color::Black);
-        sph_manager.draw(window);
+        sph_manager.draw_simulation(window);
+        sph_manager.draw_gui();
         ImGui::SFML::Render(window);
 
         // end the current frame

@@ -34,17 +34,30 @@ namespace wavy::sph {
 
         void set_particle_count(std::size_t particle_count);
         void set_particle_pattern(particle_pattern pattern);
-        void set_particle_radius(float radius) { m_particle_radius = radius; }
         void reset_particles(unsigned int seed = 1337);
 
         const std::vector<particle>& get_particles() const { return m_particles; }
         particle_pattern get_pattern() const { return m_pattern; }
+
         float get_particle_radius() const { return m_particle_radius; }
+        void set_particle_radius(float radius) { m_particle_radius = radius; }
+
+        float get_gravity() const { return m_gravity; }
+        void set_gravity(float gravity) { m_gravity = gravity; }
+
+        float get_collision_dampening() const { return m_collision_dampening; }
+        void set_collision_dampening(float collision_dampening) { m_collision_dampening = collision_dampening; }
 
     private:
+        void simulate_gravity(float delta_t);
+        void resolve_collisions();
+
         glm::vec2 m_simulation_area;
         std::vector<particle> m_particles;
         particle_pattern m_pattern;
         float m_particle_radius = 20.f;
+
+        float m_gravity = 9.81f;
+        float m_collision_dampening = .9f;
     };
 }

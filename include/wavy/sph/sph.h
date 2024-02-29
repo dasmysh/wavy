@@ -27,9 +27,14 @@ namespace wavy::sph {
 
         void draw(sf::RenderTarget& rt);
 
+        void draw_gui();
+        void draw_simulation(sf::RenderTarget& rt) const;
+
     private:
         glm::vec2 m_sim_area;
         std::unique_ptr<sph_solver> m_solver;
         float m_visual_particle_radius = 5.f;
+        float m_sim_time_scale = 300.f;
+        int m_sim_steps_per_frame = 10;
     };
 }
