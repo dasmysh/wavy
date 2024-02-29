@@ -96,9 +96,10 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
             }
         }
 
-        ImGui::SFML::Update(window, deltaClock.restart());
+        auto delta_t = deltaClock.restart();
+        ImGui::SFML::Update(window, delta_t);
 
-        sph_manager.simulation_frame(deltaClock.getElapsedTime().asSeconds());
+        sph_manager.simulation_frame(delta_t.asSeconds());
 
         // ImGui::ShowDemoWindow();
 

@@ -31,10 +31,10 @@ namespace wavy::sph {
         glm::vec2 m_sim_area;
         std::unique_ptr<sph_solver> m_solver;
         float m_visual_particle_radius = 5.f;
-        float m_sim_time_scale = 300.f;
+        float m_sim_time_scale = 10.f;
         int m_sim_steps_per_frame = 10;
 
-        float m_last_delta_t = 0.f;
+        float m_last_delta_t = 0.016f;
         bool m_delta_t_out_of_bounds = false;
 
         sf::Font m_delta_t_font;

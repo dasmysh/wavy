@@ -32,7 +32,7 @@ namespace wavy::sph {
     {
         m_delta_t_out_of_bounds = false;
         if (delta_t > 1.5f * m_last_delta_t || delta_t < 0.5f * m_last_delta_t) { m_delta_t_out_of_bounds = true; }
-        m_last_delta_t = glm::mix(m_last_delta_t, delta_t, .6f);
+        m_last_delta_t = glm::mix(m_last_delta_t, delta_t, .3f);
 
         float delta_t_step = delta_t / static_cast<float>(m_sim_steps_per_frame);
         for (int i = 0; i < m_sim_steps_per_frame; ++i) {
@@ -120,7 +120,7 @@ namespace wavy::sph {
             rt.draw(particleShape);
         }
 
-        sf::Text delta_t_text(fmt::format("{:.5f}", m_last_delta_t), m_delta_t_font);
+        sf::Text delta_t_text(fmt::format("{:.3f}", m_last_delta_t), m_delta_t_font);
         delta_t_text.setFillColor(m_delta_t_out_of_bounds ? sf::Color::Red : sf::Color::Green);
         delta_t_text.setOutlineColor(m_delta_t_out_of_bounds ? sf::Color::Red : sf::Color::Green);
         rt.draw(delta_t_text);
