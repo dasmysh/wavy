@@ -22,7 +22,7 @@ namespace wavy::sph {
 
     sph::~sph() = default;
 
-    void wavy::sph::sph::draw(sf::RenderTarget& rt) const
+    void wavy::sph::sph::draw(sf::RenderTarget& rt)
     {
         auto rt_size = rt.getSize();
         auto area_offset = glm::vec2{0.05f * static_cast<float>(rt_size.x), 0.05f * static_cast<float>(rt_size.y)};
@@ -43,22 +43,30 @@ namespace wavy::sph {
         rt.draw(line_left);
         rt.draw(line_right);
 
-        sf::CircleShape particleShape{ 5.0f };
+        sf::CircleShape particleShape{m_visual_particle_radius};
+        particleShape.setOrigin(m_visual_particle_radius, m_visual_particle_radius);
         particleShape.setFillColor(sf::Color::Blue);
 
         for (const auto& particles = m_solver->get_particles(); const auto& particle : particles) {
             auto relative_position = particle.position / m_sim_area;
             auto render_position = area_offset + relative_position * area_size;
-            particleShape.setPosition(render_position.x, render_position.y); // TODO: fix radius
+            particleShape.setPosition(render_position.x, render_position.y);
             rt.draw(particleShape);
         }
 
         if (ImGui::Begin("SPH Settings")) {
 
+            ImGui::SliderFloat("Visual Particle Radius", &m_visual_particle_radius, .001f, 100.f);
+
             if (auto particle_count = static_cast<int>(m_solver->get_particles().size());
                 ImGui::InputInt("Particle Count", &particle_count))
             {
                 m_solver->set_particle_count(static_cast<std::size_t>(particle_count));
+            }
+
+            if (auto particle_radius = m_solver->get_particle_radius();
+                ImGui::SliderFloat("Particle Radius", &particle_radius, .001f, 100.f)) {
+                m_solver->set_particle_radius(particle_radius);
             }
 
             std::array<const char*, 2> pattern_names{"random", "centered_grid"};

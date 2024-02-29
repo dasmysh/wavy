@@ -25,10 +25,11 @@ namespace wavy::sph {
         explicit sph(const glm::vec2& sim_area);
         ~sph();
 
-        void draw(sf::RenderTarget& rt) const;
+        void draw(sf::RenderTarget& rt);
 
     private:
         glm::vec2 m_sim_area;
         std::unique_ptr<sph_solver> m_solver;
+        float m_visual_particle_radius = 5.f;
     };
 }

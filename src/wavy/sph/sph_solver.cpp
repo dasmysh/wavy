@@ -50,15 +50,15 @@ namespace wavy::sph {
             });
         } else if (m_pattern == particle_pattern::centered_grid) {
             auto grid_width = glm::ceil(glm::sqrt(static_cast<float>(m_particles.size())));
-            // TODO: flip y axis???
-            auto pos_offset = 0.5f * m_simulation_area - 0.5f * grid_width * 20.0f; // TODO: fix hardcoded radius
+            auto pos_offset = .5f * m_simulation_area
+                              + glm::vec2{-.5f, .5f} * grid_width * m_particle_radius;
 
-            std::ranges::for_each(utils::enumerate(m_particles), [grid_width, &pos_offset](auto enum_particle) {
+            std::ranges::for_each(utils::enumerate(m_particles), [this, grid_width, &pos_offset](auto enum_particle) {
                 auto i = static_cast<float>(std::get<0>(enum_particle));
                 auto x = glm::mod(i, grid_width);
-                auto y = glm::floor(i / grid_width);
+                auto y = -glm::floor(i / grid_width) -.5f;
                 std::get<1>(enum_particle).position =
-                    pos_offset + glm::vec2{x, y} * 20.0f; // TODO: fix hardcoded radius
+                    pos_offset + glm::vec2{x, y} * m_particle_radius;
                 });
         }
     }
