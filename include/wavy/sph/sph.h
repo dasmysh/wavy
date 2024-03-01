@@ -31,9 +31,10 @@ namespace wavy::sph {
     private:
         void visualize_scalar_field_points(sf::RenderTarget& rt, std::size_t i, const glm::vec2& area_offset,
                                            const glm::vec2& area_size) const;
-
         void visualize_scalar_field(sf::RenderTarget& rt, std::size_t i, const glm::vec2& area_offset,
                                     const glm::vec2& area_size) const;
+        void draw_grid(sf::RenderTarget& rt, const glm::vec2& area_offset, const glm::vec2& area_size) const;
+
 
         void update_smoothing_kernels();
         void update_smoothing_kernel(std::size_t i, unsigned int radius);

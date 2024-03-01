@@ -147,6 +147,8 @@ namespace wavy::sph {
         rt.draw(line_left);
         rt.draw(line_right);
 
+        draw_grid(rt, area_offset, area_size);
+
         if (m_visualize_scalar != -1) {
             if (m_show_scalar_field_texture) {
                 visualize_scalar_field(rt, static_cast<std::size_t>(m_visualize_scalar), area_offset, area_size);
@@ -213,6 +215,38 @@ namespace wavy::sph {
         sf::Sprite field_sprite;
         field_sprite.setTexture(m_scalar_field_texture);
         rt.draw(field_sprite);
+    }
+
+    void sph::draw_grid(sf::RenderTarget& rt, const glm::vec2& area_offset, const glm::vec2& area_size) const
+    {
+        constexpr float line_thickness = 3.f;
+        auto grid_size = m_solver->get_particle_radius() * (m_sim_area / area_size);
+        sf::Color line_color{150, 150, 150, 100};
+
+        sf::RectangleShape line_horizontal{sf::Vector2f(area_size.x, line_thickness)};
+        line_horizontal.setOrigin(-area_offset.x, .5f * line_thickness);
+        line_horizontal.setOutlineColor(line_color);
+        line_horizontal.setFillColor(line_color);
+
+        sf::RectangleShape line_vertical{sf::Vector2f(line_thickness, area_size.y)};
+        line_vertical.setOrigin(.5f * line_thickness, area_size.y - area_offset.y);
+        line_vertical.setOutlineColor(line_color);
+        line_vertical.setFillColor(line_color);
+
+        float y_line = area_offset.y - grid_size.y;
+        while (y_line > area_offset.y - area_size.y) {
+            line_horizontal.setPosition(0.f, y_line);
+            rt.draw(line_horizontal);
+            y_line -= grid_size.y;
+        }
+
+        float x_line = area_offset.x + grid_size.x;
+        while (x_line < area_offset.x + area_size.x) {
+            // auto render_position = area_offset.x + x_line * (area_size.x / m_sim_area.x);
+            line_vertical.setPosition(x_line, 0.f);
+            rt.draw(line_vertical);
+            x_line += grid_size.x;
+        }
     }
 
     void sph::update_smoothing_kernels()
