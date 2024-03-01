@@ -57,5 +57,6 @@ namespace wavy::sph {
         mutable sf::Texture m_scalar_field_texture;
         bool m_show_scalar_field_texture = false;
         mutable bool m_update_scalar_field = true;
+        mutable std::vector<unsigned int> m_screen_ys;
     };
 }

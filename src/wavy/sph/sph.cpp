@@ -14,6 +14,8 @@
 #include "imgui.h"
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
+#include <numeric>
+#include <execution>
 
 namespace wavy::sph {
 
@@ -256,26 +258,34 @@ namespace wavy::sph {
     void sph::update_scalar_field_texture(const sf::RenderTarget& rt, std::size_t i, const glm::vec2& area_offset,
                                           const glm::vec2& area_size) const
     {
+        auto scalar_field_size = rt.getSize();
         sf::Image scalar_field_image;
-        scalar_field_image.create(rt.getSize().x, rt.getSize().y);
+        scalar_field_image.create(scalar_field_size.x, scalar_field_size.y);
+
+        if (m_screen_ys.size() != scalar_field_size.y)
+        { m_screen_ys.resize(scalar_field_size.y);
+            std::ranges::iota(m_screen_ys, 0);
+        }
 
         float scale = 0.f;
         if (i == 0) { scale = .2f / m_solver->density_kernel(0.f); }
         if (i == 1) { scale = .5f / m_solver->property_kernel(0.f); }
 
-        auto scalar_field_size = rt.getSize();
-        for (auto iy = 0u; iy < scalar_field_size.y; ++iy) {
-            for (auto ix = 0u; ix < scalar_field_size.x; ++ix) {
-                glm::vec2 p = glm::vec2{ix, iy} + glm::vec2{0.5};
 
-                auto relative_position = glm::vec2{1.f, -1.f} * (p - area_offset) / area_size;
-                auto sim_position = relative_position * m_sim_area;
+        std::for_each(std::execution::par, std::begin(m_screen_ys), std::end(m_screen_ys),
+                      [this, &scalar_field_size, &area_offset, &area_size, scale, &scalar_field_image, i](auto iy) {
+                          for (auto ix = 0u; ix < scalar_field_size.x; ++ix) {
+                              glm::vec2 p = glm::vec2{ix, iy} + glm::vec2{0.5};
 
-                auto c = calculate_scalar_color_at(sim_position, i, scale);
-                scalar_field_image.setPixel(ix, iy, c);
-            }
-        }
+                              auto relative_position = glm::vec2{1.f, -1.f} * (p - area_offset) / area_size;
+                              auto sim_position = relative_position * m_sim_area;
 
+                              auto c = calculate_scalar_color_at(sim_position, i, scale);
+                              scalar_field_image.setPixel(ix, iy, c);
+                          }
+                      });
+
+        m_scalar_field_texture.setSrgb(false);
         m_scalar_field_texture.loadFromImage(scalar_field_image);
         m_scalar_field_texture.setSmooth(true);
     }
@@ -293,7 +303,7 @@ namespace wavy::sph {
             }
 
             auto v = static_cast<sf::Uint8>(255.f * glm::clamp(value * scale, 0.f, 1.f));
-            c = sf::Color{0, 0, v};
+            c = sf::Color{0, 0, 255, v};
         }
         return c;
     }

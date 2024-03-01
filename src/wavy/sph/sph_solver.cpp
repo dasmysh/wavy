@@ -80,7 +80,8 @@ namespace wavy::sph {
     void sph_solver::simulate_gravity(float delta_t)
     {
         float delta_gravity = m_gravity * delta_t;
-        std::ranges::for_each(m_particles, [delta_gravity, delta_t](auto& particle) {
+        std::for_each(std::execution::par, std::begin(m_particles), std::end(m_particles),
+                      [delta_gravity, delta_t](auto& particle) {
             particle.velocity += glm::vec2{0.f, -1.f} * delta_gravity;
             particle.position += particle.velocity * delta_t;
         });
@@ -88,7 +89,7 @@ namespace wavy::sph {
 
     void sph_solver::resolve_collisions()
     {
-        std::ranges::for_each(m_particles, [this](auto& particle) {
+        std::for_each(std::execution::par, std::begin(m_particles), std::end(m_particles), [this](auto& particle) {
             if (particle.position.x < m_particle_radius) {
                 particle.position.x = m_particle_radius;
                 particle.velocity.x *= -1.f * (1.f - m_collision_dampening);
