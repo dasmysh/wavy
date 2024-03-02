@@ -12,6 +12,7 @@
 #include "utils/enumerate.h"
 
 #include "imgui.h"
+#include "imgui_stdlib.h"
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
 #include <numeric>
@@ -20,7 +21,7 @@
 namespace wavy::sph {
 
     sph::sph(const glm::vec2& sim_area)
-        : m_sim_area{sim_area}
+        : m_simulation_size{sim_area}
         , m_solver{std::make_unique<sph_solver>(sim_area)}
     {
         if (auto font_file = "../assets/monaspace/MonaspaceNeonVarVF[wght,wdth,slnt].ttf";
@@ -128,32 +129,34 @@ namespace wavy::sph {
 
     void sph::draw_simulation(sf::RenderTarget& rt) const
     {
-        auto rt_size = rt.getSize();
-        auto area_offset = glm::vec2{0.05f * static_cast<float>(rt_size.x), 0.95f * static_cast<float>(rt_size.y)};
-        auto area_size = glm::vec2{0.9f * static_cast<float>(rt_size.x), 0.9f * static_cast<float>(rt_size.y)};
+        constexpr float border_size_ratio = .05f;
+        constexpr float render_area_size_ratio = 1.f - 2.f * border_size_ratio;
+        m_screen_size = glm::vec2{rt.getSize().x, rt.getSize().y};
+        m_render_offset = glm::vec2{border_size_ratio * m_screen_size.x, border_size_ratio * m_screen_size.y};
+        m_render_size = glm::vec2{render_area_size_ratio * m_screen_size.x, render_area_size_ratio * m_screen_size.y};
 
-        sf::RectangleShape line_top{sf::Vector2f(static_cast<float>(rt_size.x), static_cast<float>(rt_size.y) * 0.05f)};
+        sf::RectangleShape line_top{sf::Vector2f(m_screen_size.x, m_screen_size.y * border_size_ratio)};
         line_top.setFillColor(sf::Color::White);
         auto line_bottom = line_top;
-        line_bottom.setPosition(0.0f, static_cast<float>(rt_size.y) * 0.95f);
-        sf::RectangleShape line_left{
-            sf::Vector2f(static_cast<float>(rt_size.x) * 0.05f, static_cast<float>(rt_size.y))};
+        line_bottom.setPosition(0.0f, m_screen_size.y * border_size_ratio + m_render_size.y);
+        sf::RectangleShape line_left{sf::Vector2f(m_screen_size.x * border_size_ratio, m_screen_size.y)};
         line_left.setFillColor(sf::Color::White);
         auto line_right = line_left;
-        line_right.setPosition(static_cast<float>(rt_size.x) * 0.95f, 0.0f);
+        line_right.setPosition(m_screen_size.x * border_size_ratio + m_render_size.x, 0.0f);
 
         rt.draw(line_top);
         rt.draw(line_bottom);
         rt.draw(line_left);
         rt.draw(line_right);
 
-        draw_grid(rt, area_offset, area_size);
+
+        draw_grid(rt);
 
         if (m_visualize_scalar != -1) {
             if (m_show_scalar_field_texture) {
-                visualize_scalar_field(rt, static_cast<std::size_t>(m_visualize_scalar), area_offset, area_size);
+                visualize_scalar_field(rt, static_cast<std::size_t>(m_visualize_scalar));
             } else {
-                visualize_scalar_field_points(rt, static_cast<std::size_t>(m_visualize_scalar), area_offset, area_size);
+                visualize_scalar_field_points(rt, static_cast<std::size_t>(m_visualize_scalar));
             }
         }
 
@@ -161,22 +164,19 @@ namespace wavy::sph {
         particleShape.setOrigin(m_visual_particle_radius, m_visual_particle_radius);
         particleShape.setFillColor(sf::Color::Blue);
 
-        for (const auto& particles = m_solver->get_particles(); const auto& particle : particles) {
-            auto relative_position = particle.position / m_sim_area;
-            auto render_position = area_offset + glm::vec2{1.f, -1.f} * relative_position * area_size;
             particleShape.setPosition(render_position.x, render_position.y);
             rt.draw(particleShape);
+        for (const auto& particles = m_solver->get_particles(); const auto& [index, particle] : utils::enumerate(particles)) {
+            auto render_position = simulation_to_screen(particle.position);
         }
 
         sf::Text delta_t_text(fmt::format("{:.3f}", m_last_delta_t), m_delta_t_font);
         delta_t_text.setFillColor(m_delta_t_out_of_bounds ? sf::Color::Red : sf::Color::Green);
         delta_t_text.setOutlineColor(m_delta_t_out_of_bounds ? sf::Color::Red : sf::Color::Green);
         rt.draw(delta_t_text);
-
     }
 
-    void sph::visualize_scalar_field_points(sf::RenderTarget& rt, std::size_t i, const glm::vec2& area_offset,
-                                            const glm::vec2& area_size) const
+    void sph::visualize_scalar_field_points(sf::RenderTarget& rt, std::size_t i) const
     {
         assert(i < m_smoothing_kernels.size());
 
@@ -190,8 +190,7 @@ namespace wavy::sph {
         sf::BlendMode accumulate_blending{sf::BlendMode::SrcAlpha, sf::BlendMode::One, sf::BlendMode::Add};
 
         for (const auto& particles = m_solver->get_particles(); const auto& particle : particles) {
-            auto relative_position = particle.position / m_sim_area;
-            auto render_position = area_offset + glm::vec2{1.f, -1.f} * relative_position * area_size;
+            auto render_position = simulation_to_screen(particle.position);
             kernel_sprite.setPosition(render_position.x, render_position.y);
             sf::Uint8 v = 255;
             if (i == 1) {
@@ -204,11 +203,10 @@ namespace wavy::sph {
         }
     }
 
-    void sph::visualize_scalar_field(sf::RenderTarget& rt, std::size_t i, const glm::vec2& area_offset,
-                                     const glm::vec2& area_size) const
+    void sph::visualize_scalar_field(sf::RenderTarget& rt, std::size_t i) const
     {
         if (m_update_scalar_field || m_scalar_field_texture.getSize() != rt.getSize()) {
-            update_scalar_field_texture(rt, i, area_offset, area_size);
+            update_scalar_field_texture(i);
             m_update_scalar_field = false;
         }
 
@@ -217,32 +215,35 @@ namespace wavy::sph {
         rt.draw(field_sprite);
     }
 
-    void sph::draw_grid(sf::RenderTarget& rt, const glm::vec2& area_offset, const glm::vec2& area_size) const
+    void sph::draw_grid(sf::RenderTarget& rt) const
     {
         constexpr float line_thickness = 3.f;
-        auto grid_size = m_solver->get_particle_radius() * (m_sim_area / area_size);
+        auto grid_size = simulation_to_render_area(glm::vec2{m_solver->get_particle_radius(), m_simulation_size.y - m_solver->get_particle_radius()});
         sf::Color line_color{150, 150, 150, 100};
 
-        sf::RectangleShape line_horizontal{sf::Vector2f(area_size.x, line_thickness)};
-        line_horizontal.setOrigin(-area_offset.x, .5f * line_thickness);
+        sf::RectangleShape line_horizontal{sf::Vector2f(m_render_size.x, line_thickness)};
+        line_horizontal.setOrigin(-render_area_to_screen(glm::vec2{0.f}).x, .5f * line_thickness);
         line_horizontal.setOutlineColor(line_color);
         line_horizontal.setFillColor(line_color);
 
-        sf::RectangleShape line_vertical{sf::Vector2f(line_thickness, area_size.y)};
-        line_vertical.setOrigin(.5f * line_thickness, area_size.y - area_offset.y);
+        sf::RectangleShape line_vertical{sf::Vector2f(line_thickness, m_render_size.y)};
+        line_vertical.setOrigin(.5f * line_thickness,
+                                -render_area_to_screen(glm::vec2{0.f}).y);
         line_vertical.setOutlineColor(line_color);
         line_vertical.setFillColor(line_color);
 
-        float y_line = area_offset.y - grid_size.y;
-        while (y_line > area_offset.y - area_size.y) {
+        const auto line_start = render_area_to_screen(glm::abs(simulation_to_render_area(glm::vec2{m_solver->get_particle_radius()})));
+        const auto line_end = render_area_to_screen(glm::vec2{m_render_size.x, 0.f});
+
+        float y_line = line_start.y;
+        while (y_line > line_end.y) {
             line_horizontal.setPosition(0.f, y_line);
             rt.draw(line_horizontal);
             y_line -= grid_size.y;
         }
 
-        float x_line = area_offset.x + grid_size.x;
-        while (x_line < area_offset.x + area_size.x) {
-            // auto render_position = area_offset.x + x_line * (area_size.x / m_sim_area.x);
+        float x_line = line_start.x;
+        while (x_line < line_end.x) {
             line_vertical.setPosition(x_line, 0.f);
             rt.draw(line_vertical);
             x_line += grid_size.x;
@@ -289,15 +290,14 @@ namespace wavy::sph {
         kernel.setSmooth(true);
     }
 
-    void sph::update_scalar_field_texture(const sf::RenderTarget& rt, std::size_t i, const glm::vec2& area_offset,
-                                          const glm::vec2& area_size) const
+    void sph::update_scalar_field_texture(std::size_t i) const
     {
-        auto scalar_field_size = rt.getSize();
         sf::Image scalar_field_image;
-        scalar_field_image.create(scalar_field_size.x, scalar_field_size.y);
+        scalar_field_image.create(static_cast<unsigned int>(m_screen_size.x),
+                                  static_cast<unsigned int>(m_screen_size.y));
 
-        if (m_screen_ys.size() != scalar_field_size.y)
-        { m_screen_ys.resize(scalar_field_size.y);
+        if (m_screen_ys.size() != static_cast<std::size_t>(m_screen_size.y)) {
+            m_screen_ys.resize(static_cast<std::size_t>(m_screen_size.y));
             std::ranges::iota(m_screen_ys, 0);
         }
 
@@ -307,14 +307,12 @@ namespace wavy::sph {
 
 
         std::for_each(std::execution::par, std::begin(m_screen_ys), std::end(m_screen_ys),
-                      [this, &scalar_field_size, &area_offset, &area_size, scale, &scalar_field_image, i](auto iy) {
-                          for (auto ix = 0u; ix < scalar_field_size.x; ++ix) {
+                      [this, scale, &scalar_field_image, i](auto iy) {
+                          for (auto ix = 0u; ix < static_cast<unsigned int>(m_screen_size.x); ++ix) {
                               glm::vec2 p = glm::vec2{ix, iy} + glm::vec2{0.5};
+                              auto simulation_position = screen_to_simulation(p);
 
-                              auto relative_position = glm::vec2{1.f, -1.f} * (p - area_offset) / area_size;
-                              auto sim_position = relative_position * m_sim_area;
-
-                              auto c = calculate_scalar_color_at(sim_position, i, scale);
+                              auto c = calculate_scalar_color_at(simulation_position, i, scale);
                               scalar_field_image.setPixel(ix, iy, c);
                           }
                       });
@@ -327,8 +325,8 @@ namespace wavy::sph {
     sf::Color sph::calculate_scalar_color_at(const glm::vec2& sim_position, std::size_t i, float scale) const
     {
         auto c = sf::Color{0, 0, 0, 0};
-        if (sim_position.x >= 0.f && sim_position.x < m_sim_area.x && sim_position.y >= 0.f
-            && sim_position.y < m_sim_area.y) {
+        if (sim_position.x >= 0.f && sim_position.x < m_simulation_size.x && sim_position.y >= 0.f
+            && sim_position.y < m_simulation_size.y) {
             float value = 0.f;
             if (i == 0) {
                 value = m_solver->calculate_density(sim_position);
@@ -340,6 +338,38 @@ namespace wavy::sph {
             c = sf::Color{0, 0, 255, v};
         }
         return c;
+    }
+
+
+    glm::vec2 sph::screen_to_simulation(const glm::vec2& screen_pos) const
+    {
+        return render_area_to_simulation(screen_to_render_area(screen_pos));
+    }
+
+    glm::vec2 sph::screen_to_render_area(const glm::vec2& screen_pos) const
+    {
+        return screen_pos - m_render_offset;
+    }
+
+    glm::vec2 sph::simulation_to_screen(const glm::vec2& simulation_pos) const
+    {
+        return render_area_to_screen(simulation_to_render_area(simulation_pos));
+    }
+
+    glm::vec2 sph::render_area_to_screen(const glm::vec2& render_pos) const
+    {
+        return m_render_offset + render_pos;
+    }
+
+    glm::vec2 sph::simulation_to_render_area(const glm::vec2& simulation_pos) const
+    {
+        return glm::vec2{0.f, m_render_size.y} + glm::vec2{1.f, -1.f} * simulation_pos * (m_render_size / m_simulation_size);
+
+    }
+
+    glm::vec2 sph::render_area_to_simulation(const glm::vec2& render_pos) const
+    {
+        return glm::vec2{1.f, -1.f} * render_pos * (m_simulation_size / m_render_size);
     }
 
 }

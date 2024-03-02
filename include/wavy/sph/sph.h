@@ -29,20 +29,25 @@ namespace wavy::sph {
         void draw_simulation(sf::RenderTarget& rt) const;
 
     private:
-        void visualize_scalar_field_points(sf::RenderTarget& rt, std::size_t i, const glm::vec2& area_offset,
-                                           const glm::vec2& area_size) const;
-        void visualize_scalar_field(sf::RenderTarget& rt, std::size_t i, const glm::vec2& area_offset,
-                                    const glm::vec2& area_size) const;
-        void draw_grid(sf::RenderTarget& rt, const glm::vec2& area_offset, const glm::vec2& area_size) const;
+        void visualize_scalar_field_points(sf::RenderTarget& rt, std::size_t i) const;
+        void visualize_scalar_field(sf::RenderTarget& rt, std::size_t i) const;
+        void draw_grid(sf::RenderTarget& rt) const;
 
 
         void update_smoothing_kernels();
         void update_smoothing_kernel(std::size_t i, unsigned int radius);
-        void update_scalar_field_texture(const sf::RenderTarget& rt, std::size_t i, const glm::vec2& area_offset,
-                                         const glm::vec2& area_size) const;
+        void update_scalar_field_texture(std::size_t i) const;
         sf::Color calculate_scalar_color_at(const glm::vec2& sim_position, std::size_t i, float scale) const;
 
-        glm::vec2 m_sim_area;
+
+        glm::vec2 screen_to_simulation(const glm::vec2& screen_pos) const;
+        glm::vec2 screen_to_render_area(const glm::vec2& screen_pos) const;
+        glm::vec2 simulation_to_screen(const glm::vec2& simulation_pos) const;
+        glm::vec2 render_area_to_screen(const glm::vec2& render_pos) const;
+        glm::vec2 simulation_to_render_area(const glm::vec2& simulation_pos) const;
+        glm::vec2 render_area_to_simulation(const glm::vec2& render_pos) const;
+
+        glm::vec2 m_simulation_size;
         std::unique_ptr<sph_solver> m_solver;
         float m_visual_particle_radius = 5.f;
         float m_sim_time_scale = 10.f;
@@ -59,5 +64,9 @@ namespace wavy::sph {
         bool m_show_scalar_field_texture = false;
         mutable bool m_update_scalar_field = true;
         mutable std::vector<unsigned int> m_screen_ys;
+
+        mutable glm::vec2 m_screen_size;
+        mutable glm::vec2 m_render_size;
+        mutable glm::vec2 m_render_offset;
     };
 }
