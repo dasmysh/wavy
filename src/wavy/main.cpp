@@ -93,6 +93,8 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
                 // update the view to the new size of the window
                 sf::FloatRect visibleArea(0.f, 0.f, static_cast<float>(event.size.width), static_cast<float>(event.size.height));
                 window.setView(sf::View(visibleArea));
+            } else {
+                sph_manager.process_event(event);
             }
         }
 

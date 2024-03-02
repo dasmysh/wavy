@@ -26,7 +26,8 @@ namespace wavy::sph {
         void simulation_frame(float delta_t);
 
         void draw_gui();
-        void draw_simulation(sf::RenderTarget& rt) const;
+        void draw_simulation(sf::RenderTarget& rt);
+        void process_event(const sf::Event& event);
 
     private:
         void visualize_scalar_field_points(sf::RenderTarget& rt, std::size_t i) const;
@@ -73,5 +74,8 @@ namespace wavy::sph {
         mutable glm::vec2 m_render_offset;
 
         std::size_t m_selected_particle_index = static_cast<std::size_t>(-1);
+
+        bool m_mouse_clicked = false;
+        glm::vec2 m_mouse_pos_simulation{-1.f};
     };
 }

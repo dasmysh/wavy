@@ -15,6 +15,7 @@
 #include "imgui_stdlib.h"
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
+#include <glm/gtx/norm.hpp>
 #include <numeric>
 #include <execution>
 
@@ -57,7 +58,7 @@ namespace wavy::sph {
         }
     }
 
-    void sph::draw_simulation(sf::RenderTarget& rt) const
+    void sph::draw_simulation(sf::RenderTarget& rt)
     {
         constexpr float border_size_ratio = .05f;
         constexpr float render_area_size_ratio = 1.f - 2.f * border_size_ratio;
@@ -79,7 +80,6 @@ namespace wavy::sph {
         rt.draw(line_left);
         rt.draw(line_right);
 
-
         draw_grid(rt);
 
         if (m_visualize_scalar != -1) {
@@ -100,6 +100,11 @@ namespace wavy::sph {
 
         for (const auto& particles = m_solver->get_particles(); const auto& [index, particle] : utils::enumerate(particles)) {
             auto render_position = simulation_to_screen(particle.position);
+            if (m_mouse_clicked
+                && glm::distance2(particle.position, m_mouse_pos_simulation)
+                       < m_visual_particle_radius * m_visual_particle_radius) {
+                m_selected_particle_index = index;
+            }
             if (m_selected_particle_index == index) {
                 selectedParticleShape.setPosition(render_position.x, render_position.y);
                 rt.draw(selectedParticleShape);
@@ -113,6 +118,20 @@ namespace wavy::sph {
         delta_t_text.setFillColor(m_delta_t_out_of_bounds ? sf::Color::Red : sf::Color::Green);
         delta_t_text.setOutlineColor(m_delta_t_out_of_bounds ? sf::Color::Red : sf::Color::Green);
         rt.draw(delta_t_text);
+    }
+
+    void sph::process_event(const sf::Event& event)
+    {
+        m_mouse_clicked = false;
+        if (const auto& io = ImGui::GetIO(); !io.WantCaptureMouse) {
+            if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left) {
+                glm::vec2 mouse_pos_screen{static_cast<float>(event.mouseButton.x),
+                                           static_cast<float>(event.mouseButton.y)};
+                m_mouse_pos_simulation = screen_to_simulation(mouse_pos_screen);
+                m_mouse_clicked = true;
+                m_selected_particle_index = static_cast<std::size_t>(-1);
+            }
+        }
     }
 
     void sph::visualize_scalar_field_points(sf::RenderTarget& rt, std::size_t i) const
@@ -386,6 +405,28 @@ namespace wavy::sph {
         }
     }
 
+    void sph::draw_particle_info_table_rows(std::size_t index, const sph_solver::particle& particle)
+    {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        if (bool selected = index == m_selected_particle_index;
+            ImGui::Selectable(fmt::format("({}, {})", particle.position.x, particle.position.y).c_str(), selected,
+                              ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
+            m_selected_particle_index = index;
+        }
+        ImGui::TableNextColumn();
+        ImGui::Text("(%f, %f)", particle.velocity.x, particle.velocity.y);
+        ImGui::TableNextColumn();
+        ImGui::Text("%f", particle.density);
+        ImGui::TableNextColumn();
+        ImGui::Text("%f", particle.property);
+        ImGui::TableNextColumn();
+        auto grid_cell = m_solver->grid_cell(particle.position);
+        ImGui::Text("(%u, %u)", grid_cell.x, grid_cell.y);
+        ImGui::TableNextColumn();
+        ImGui::Text("%uz", particle.grid_index);
+    }
+
     glm::vec2 sph::screen_to_simulation(const glm::vec2& screen_pos) const
     {
         return render_area_to_simulation(screen_to_render_area(screen_pos));
@@ -414,29 +455,7 @@ namespace wavy::sph {
 
     glm::vec2 sph::render_area_to_simulation(const glm::vec2& render_pos) const
     {
-        return glm::vec2{1.f, -1.f} * render_pos * (m_simulation_size / m_render_size);
+        return glm::vec2{1.f, -1.f} * (render_pos - glm::vec2{0.f, m_render_size.y})
+               * (m_simulation_size / m_render_size);
     }
-
-    void sph::draw_particle_info_table_rows(std::size_t index, const sph_solver::particle& particle)
-    {
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        if (bool selected = index == m_selected_particle_index;
-            ImGui::Selectable(fmt::format("({}, {})", particle.position.x, particle.position.y).c_str(), selected,
-                              ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
-            m_selected_particle_index = index;
-        }
-        ImGui::TableNextColumn();
-        ImGui::Text("(%f, %f)", particle.velocity.x, particle.velocity.y);
-        ImGui::TableNextColumn();
-        ImGui::Text("%f", particle.density);
-        ImGui::TableNextColumn();
-        ImGui::Text("%f", particle.property);
-        ImGui::TableNextColumn();
-        auto grid_cell = m_solver->grid_cell(particle.position);
-        ImGui::Text("(%u, %u)", grid_cell.x, grid_cell.y);
-        ImGui::TableNextColumn();
-        ImGui::Text("%uz", particle.grid_index);
-    }
-
 }
