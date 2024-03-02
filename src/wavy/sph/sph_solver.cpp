@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <random>
 #include <execution>
+#include <barrier>
 
 namespace wavy::sph {
 
@@ -127,31 +128,50 @@ namespace wavy::sph {
 
     void sph_solver::calculate_cell_offsets()
     {
-        // TODO: emulate local / global split like in compute shaders using std::latch
-        // https://en.cppreference.com/w/cpp/thread/latch
+        constexpr std::size_t emulated_mp_count = 4;
+        std::atomic_int global_cell_offset_count = 0;
+        std::vector<std::atomic_int> local_particle_count(emulated_mp_count);
+        std::vector<std::size_t> global_cell_offsets(emulated_mp_count);
 
-        // shared: uint localParticleCount, uint globalParticleBaseOffset;
-        // index == 0: localParticleCount = 0
-        // barrier, localParticleOffset = atomicAdd(localParticleCount, cellParticleCount), barrier
-        // localIndex == 0: globalParticleBaseOffset = atomicAdd(globalParticleCount, localParticleCount);
-        // barrier
-        // m_cell_offsets[index] = globalParticleBaseOffset + localParticleOffset;
-        // m_particle_histogram[index] = 0;???
+        std::vector<std::unique_ptr<std::barrier<>>> inits_done;
+        std::vector<std::size_t> barrier_sizes;
 
-        std::atomic_int global_cell_count = 0;
+        auto threads_to_distribute = m_particle_histogram.size();
+        for (std::size_t i = 0; i < emulated_mp_count; ++i) {
+            auto mps_left = emulated_mp_count - i;
+            auto threads_on_mp = (threads_to_distribute + mps_left - 1) / mps_left;
+            inits_done.emplace_back(std::make_unique<std::barrier<>>(threads_on_mp));
+            barrier_sizes.emplace_back(threads_on_mp);
+            threads_to_distribute -= threads_on_mp;
+        }
+
         auto enumerate_cells = utils::enumerate(m_particle_histogram);
         std::for_each(std::execution::par, std::begin(enumerate_cells), std::end(enumerate_cells),
-                      [this, &global_cell_count](const auto& enumerated_cell_content_count) {
-                          auto index = std::get<0>(enumerated_cell_content_count);
-                          const auto& cell_content_count = std::get<1>(enumerated_cell_content_count).load();
-                          if (cell_content_count == 0) {
-                              m_cell_offsets[index] = 0;
-                              return;
+                      [this, &global_cell_offset_count, &local_particle_count, &global_cell_offsets,
+                       &inits_done](const auto& enumerated_cell_content_count) {
+                          auto global_index = std::get<0>(enumerated_cell_content_count);
+                          auto cell_content_count = std::get<1>(enumerated_cell_content_count).load();
+                          auto local_index = global_index / emulated_mp_count;
+                          auto emulated_mp_index = global_index % emulated_mp_count;
+
+                          if (local_index == 0) { local_particle_count[emulated_mp_index] = 0; }
+
+                          inits_done[emulated_mp_index]->arrive_and_wait();
+
+                          auto local_particle_offset =
+                              local_particle_count[emulated_mp_index].fetch_add(cell_content_count);
+
+                          inits_done[emulated_mp_index]->arrive_and_wait();
+
+                          if (local_index == 0) {
+                              global_cell_offsets[emulated_mp_index] =
+                                  global_cell_offset_count.fetch_add(local_particle_count[emulated_mp_index].load());
                           }
 
-                          auto cell_offset = global_cell_count.fetch_add(cell_content_count);
-                          m_cell_offsets[index] = cell_offset;
-                          m_particle_histogram[index] = 0;
+                          inits_done[emulated_mp_index]->arrive_and_wait();
+
+                          m_cell_offsets[global_index] = global_cell_offsets[emulated_mp_index] + local_particle_offset;
+                          m_particle_histogram[global_index] = 0;
                       });
     }
 
