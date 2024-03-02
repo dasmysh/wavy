@@ -39,6 +39,7 @@ namespace wavy::sph {
         void update_scalar_field_texture(std::size_t i) const;
         sf::Color calculate_scalar_color_at(const glm::vec2& sim_position, std::size_t i, float scale) const;
 
+        void draw_settings_gui();
 
         glm::vec2 screen_to_simulation(const glm::vec2& screen_pos) const;
         glm::vec2 screen_to_render_area(const glm::vec2& screen_pos) const;
