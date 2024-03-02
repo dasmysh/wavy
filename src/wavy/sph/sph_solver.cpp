@@ -23,9 +23,12 @@ namespace wavy::sph {
     sph_solver::sph_solver(const glm::vec2& simulation_area, std::size_t initial_particle_count /*= 100*/,
                            particle_pattern pattern /*= particle_pattern::random */)
         : m_simulation_area{simulation_area}
-        , m_particles{initial_particle_count}
+        , m_particles(initial_particle_count)
+        , m_particle_indices(initial_particle_count)
+        , m_particle_histogram(initial_particle_count)
         , m_pattern{pattern}
     {
+        std::ranges::for_each(m_particle_histogram, [](auto& v) { v = 0; });
         reset_particles();
     }
 
@@ -35,12 +38,18 @@ namespace wavy::sph {
     {
         simulate_gravity(delta_t);
         resolve_collisions();
+
+        // TODO
+
         update_densities();
     }
 
     void sph_solver::set_particle_count(std::size_t particle_count)
     {
         m_particles.resize(particle_count);
+        m_particle_indices.resize(particle_count);
+        m_particle_histogram = std::vector<std::atomic_int>(particle_count);
+        std::ranges::for_each(m_particle_histogram, [](auto& v) { v = 0; });
         reset_particles();
     }
 
@@ -106,6 +115,9 @@ namespace wavy::sph {
                 particle.position.y = m_simulation_area.y - m_particle_radius;
                 particle.velocity.y *= -1.f * (1.f - m_collision_dampening);
             }
+
+            particle.grid_index = grid_hash(grid_cell(particle.position)) % m_particle_indices.size();
+            m_particle_histogram[particle.grid_index] += 1;
         });
     }
 
@@ -115,10 +127,23 @@ namespace wavy::sph {
                       [this](auto& particle) { particle.density = calculate_density(particle.position); });
     }
 
+    glm::uvec2 sph_solver::grid_cell(const glm::vec2& p) const
+    {
+        return glm::uvec2{glm::floor(p / m_particle_radius)};
+    }
+
+    std::size_t sph_solver::grid_hash(const glm::uvec2& cell)
+    {
+        constexpr std::size_t prime_x = 94847;
+        constexpr std::size_t prime_y = 31699;
+        return cell.x * prime_x + cell.y * prime_y;
+    }
+
     float sph_solver::calculate_density(const glm::vec2& p) const
     {
         float density = 0.f;
 
+        // TODO: only iterate over nearby particles
         std::ranges::for_each(m_particles, [this, &density, &p](auto& particle) {
             float r = glm::length(particle.position - p);
             float influence = density_kernel(r);
@@ -132,6 +157,7 @@ namespace wavy::sph {
     {
         float property = 0.f;
 
+        // TODO: only iterate over nearby particles
         std::ranges::for_each(m_particles, [this, &property, &p](auto& particle) {
             float r = glm::length(particle.position - p);
             float influence = property_kernel(r);

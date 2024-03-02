@@ -34,6 +34,7 @@ namespace wavy::sph {
             glm::vec2 velocity = glm::vec2{0.f};
             float density = 0.f;
             float property = 0.f;
+            std::size_t grid_index;
         };
 
         void simulation_step(float delta_t);
@@ -62,16 +63,21 @@ namespace wavy::sph {
         float property_kernel(float r) const;
         float calculate_density(const glm::vec2& p) const;
         float calculate_property(const glm::vec2& p) const;
+        glm::uvec2 grid_cell(const glm::vec2& p) const;
 
     private:
         void simulate_gravity(float delta_t);
         void resolve_collisions();
         void update_densities();
 
+        static std::size_t grid_hash(const glm::uvec2& cell);
+
         static float calc_property(const glm::vec2& p);
 
         glm::vec2 m_simulation_area;
         std::vector<particle> m_particles;
+        std::vector<std::size_t> m_particle_indices;
+        std::vector<std::atomic_int> m_particle_histogram;
         particle_pattern m_pattern;
         float m_particle_radius = 20.f;
         float m_particle_mass = 1.f;
