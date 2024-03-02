@@ -49,6 +49,7 @@ namespace wavy::sph {
         if (ImGui::Begin("SPH")) {
             if (ImGui::BeginTabBar("SPH#tabs_bar")) {
                 draw_settings_gui();
+                draw_particle_info_gui();
                 ImGui::EndTabBar();
             }
 
@@ -91,12 +92,21 @@ namespace wavy::sph {
 
         sf::CircleShape particleShape{m_visual_particle_radius};
         particleShape.setOrigin(m_visual_particle_radius, m_visual_particle_radius);
+        auto selectedParticleShape = particleShape;
         particleShape.setFillColor(sf::Color::Blue);
+        selectedParticleShape.setOutlineThickness(1.f);
+        selectedParticleShape.setOutlineColor(sf::Color::Red);
+        selectedParticleShape.setFillColor(sf::Color::Blue);
 
-            particleShape.setPosition(render_position.x, render_position.y);
-            rt.draw(particleShape);
         for (const auto& particles = m_solver->get_particles(); const auto& [index, particle] : utils::enumerate(particles)) {
             auto render_position = simulation_to_screen(particle.position);
+            if (m_selected_particle_index == index) {
+                selectedParticleShape.setPosition(render_position.x, render_position.y);
+                rt.draw(selectedParticleShape);
+            } else {
+                particleShape.setPosition(render_position.x, render_position.y);
+                rt.draw(particleShape);
+            }
         }
 
         sf::Text delta_t_text(fmt::format("{:.3f}", m_last_delta_t), m_delta_t_font);
@@ -285,6 +295,7 @@ namespace wavy::sph {
                 ImGui::InputInt("Particle Count", &particle_count)) {
                 m_solver->set_particle_count(static_cast<std::size_t>(particle_count));
                 m_update_scalar_field = true;
+                m_selected_particle_index = static_cast<std::size_t>(-1);
             }
 
             std::array<const char*, 2> pattern_names{"random", "centered_grid"};
@@ -292,6 +303,7 @@ namespace wavy::sph {
                     "Pattern", &current_pattern, pattern_names.data(), static_cast<int>(pattern_names.size()))) {
                 m_solver->set_particle_pattern(static_cast<particle_pattern>(current_pattern));
                 m_update_scalar_field = true;
+                m_selected_particle_index = static_cast<std::size_t>(-1);
             }
 
             static int seed = 1337;
@@ -300,6 +312,7 @@ namespace wavy::sph {
             if (ImGui::Button("Reset Particles")) {
                 m_solver->reset_particles(seed);
                 m_update_scalar_field = true;
+                m_selected_particle_index = static_cast<std::size_t>(-1);
             }
 
             ImGui::Spacing();
@@ -350,6 +363,29 @@ namespace wavy::sph {
         }
     }
 
+    void sph::draw_particle_info_gui()
+    {
+        if (ImGui::BeginTabItem("Particle Info")) {
+            if (ImGui::BeginTable("particle_props", 6,
+                                  ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg)) {
+                ImGui::TableSetupColumn("Position");
+                ImGui::TableSetupColumn("Velocity");
+                ImGui::TableSetupColumn("Density");
+                ImGui::TableSetupColumn("Property");
+                ImGui::TableSetupColumn("Grid Cell");
+                ImGui::TableSetupColumn("Grid Index");
+                ImGui::TableSetupScrollFreeze(0, 1);
+                ImGui::TableHeadersRow();
+
+                for (const auto& [index, particle] : utils::enumerate(m_solver->get_particles())) {
+                    draw_particle_info_table_rows(index, particle);
+                }
+                ImGui::EndTable();
+            }
+            ImGui::EndTabItem();
+        }
+    }
+
     glm::vec2 sph::screen_to_simulation(const glm::vec2& screen_pos) const
     {
         return render_area_to_simulation(screen_to_render_area(screen_pos));
@@ -379,6 +415,28 @@ namespace wavy::sph {
     glm::vec2 sph::render_area_to_simulation(const glm::vec2& render_pos) const
     {
         return glm::vec2{1.f, -1.f} * render_pos * (m_simulation_size / m_render_size);
+    }
+
+    void sph::draw_particle_info_table_rows(std::size_t index, const sph_solver::particle& particle)
+    {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        if (bool selected = index == m_selected_particle_index;
+            ImGui::Selectable(fmt::format("({}, {})", particle.position.x, particle.position.y).c_str(), selected,
+                              ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
+            m_selected_particle_index = index;
+        }
+        ImGui::TableNextColumn();
+        ImGui::Text("(%f, %f)", particle.velocity.x, particle.velocity.y);
+        ImGui::TableNextColumn();
+        ImGui::Text("%f", particle.density);
+        ImGui::TableNextColumn();
+        ImGui::Text("%f", particle.property);
+        ImGui::TableNextColumn();
+        auto grid_cell = m_solver->grid_cell(particle.position);
+        ImGui::Text("(%u, %u)", grid_cell.x, grid_cell.y);
+        ImGui::TableNextColumn();
+        ImGui::Text("%uz", particle.grid_index);
     }
 
 }

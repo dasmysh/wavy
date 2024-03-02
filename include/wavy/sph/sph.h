@@ -8,14 +8,14 @@
 
 #pragma once
 
+#include "sph_solver.h"
+
 #include <SFML/Graphics.hpp>
 #include <glm/vec2.hpp>
 #include <array>
 #include <memory>
 
 namespace wavy::sph {
-
-    class sph_solver;
 
     class sph
     {
@@ -40,6 +40,8 @@ namespace wavy::sph {
         sf::Color calculate_scalar_color_at(const glm::vec2& sim_position, std::size_t i, float scale) const;
 
         void draw_settings_gui();
+        void draw_particle_info_gui();
+        void draw_particle_info_table_rows(std::size_t index, const sph_solver::particle& particle);
 
         glm::vec2 screen_to_simulation(const glm::vec2& screen_pos) const;
         glm::vec2 screen_to_render_area(const glm::vec2& screen_pos) const;
@@ -69,5 +71,7 @@ namespace wavy::sph {
         mutable glm::vec2 m_screen_size;
         mutable glm::vec2 m_render_size;
         mutable glm::vec2 m_render_offset;
+
+        std::size_t m_selected_particle_index = static_cast<std::size_t>(-1);
     };
 }
