@@ -43,6 +43,8 @@ namespace wavy::sph {
         void draw_settings_gui();
         void draw_particle_info_gui();
         void draw_particle_info_table_rows(std::size_t index, const sph_solver::particle& particle);
+        void draw_cell_info_gui();
+        void draw_cell_info_table_rows(std::size_t index, const std::atomic_int& cell);
 
         glm::vec2 screen_to_simulation(const glm::vec2& screen_pos) const;
         glm::vec2 screen_to_render_area(const glm::vec2& screen_pos) const;
@@ -74,6 +76,7 @@ namespace wavy::sph {
         mutable glm::vec2 m_render_offset;
 
         std::size_t m_selected_particle_index = static_cast<std::size_t>(-1);
+        std::size_t m_selected_cell_index = static_cast<std::size_t>(-1);
 
         bool m_mouse_clicked = false;
         glm::vec2 m_mouse_pos_simulation{-1.f};

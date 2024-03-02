@@ -51,6 +51,7 @@ namespace wavy::sph {
             if (ImGui::BeginTabBar("SPH#tabs_bar")) {
                 draw_settings_gui();
                 draw_particle_info_gui();
+                draw_cell_info_gui();
                 ImGui::EndTabBar();
             }
 
@@ -413,8 +414,8 @@ namespace wavy::sph {
     {
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        if (bool selected = index == m_selected_particle_index;
-            ImGui::Selectable(fmt::format("({}, {})", particle.position.x, particle.position.y).c_str(), selected,
+        if (ImGui::Selectable(fmt::format("({}, {})", particle.position.x, particle.position.y).c_str(),
+                              index == m_selected_particle_index,
                               ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
             m_selected_particle_index = index;
         }
@@ -429,6 +430,58 @@ namespace wavy::sph {
         ImGui::Text("(%u, %u)", grid_cell.x, grid_cell.y);
         ImGui::TableNextColumn();
         ImGui::Text("%uz", particle.grid_index);
+    }
+
+    void sph::draw_cell_info_gui()
+    {
+        if (ImGui::BeginTabItem("Cell Info")) {
+            if (ImGui::BeginTable("cell_props", 7,
+                                  ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY
+                                      | ImGuiTableFlags_RowBg)) {
+                ImGui::TableSetupColumn("Grid Index");
+                ImGui::TableSetupColumn("Grid Cells");
+                ImGui::TableSetupColumn("Particle Count");
+                ImGui::TableSetupColumn("Particle Position");
+                ImGui::TableSetupColumn("Particle Velocity");
+                ImGui::TableSetupColumn("Particle Density");
+                ImGui::TableSetupColumn("Particle Property");
+                ImGui::TableSetupScrollFreeze(0, 1);
+                ImGui::TableHeadersRow();
+
+                for (const auto& [index, cell] : utils::enumerate(m_solver->get_cells())) {
+                    draw_cell_info_table_rows(index, cell);
+                }
+                ImGui::EndTable();
+            }
+            ImGui::EndTabItem();
+        }
+    }
+
+    void sph::draw_cell_info_table_rows(std::size_t index, const std::atomic_int& cell)
+    {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        if (ImGui::Selectable(fmt::format("{}", index).c_str(),
+                              index == m_selected_cell_index,
+                              ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
+            m_selected_cell_index = index;
+        }
+        ImGui::TableNextColumn();
+        // TODO: somehow get cell coordinates.
+        // tree view for multiple
+        // auto grid_cell = m_solver->grid_cell(particle.position);
+        // ImGui::Text("(%u, %u)", grid_cell.x, grid_cell.y);
+        ImGui::TableNextColumn();
+        ImGui::Text("%d", cell.load());
+        // TODO: tree view for particles.
+        ImGui::TableNextColumn();
+        // ImGui::Text("(%f, %f)", particle.position.x, particle.position.y);
+        ImGui::TableNextColumn();
+        // ImGui::Text("(%f, %f)", particle.velocity.x, particle.velocity.y);
+        ImGui::TableNextColumn();
+        // ImGui::Text("%f", particle.density);
+        ImGui::TableNextColumn();
+        // ImGui::Text("%f", particle.property);
     }
 
     glm::vec2 sph::screen_to_simulation(const glm::vec2& screen_pos) const

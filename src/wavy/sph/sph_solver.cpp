@@ -28,7 +28,6 @@ namespace wavy::sph {
         , m_particle_histogram(initial_particle_count)
         , m_pattern{pattern}
     {
-        std::ranges::for_each(m_particle_histogram, [](auto& v) { v = 0; });
         reset_particles();
     }
 
@@ -36,6 +35,8 @@ namespace wavy::sph {
 
     void sph_solver::simulation_step(float delta_t)
     {
+        std::for_each(std::execution::par, std::begin(m_particle_histogram), std::end(m_particle_histogram),
+                      [](auto& v) { v = 0; });
         simulate_gravity(delta_t);
         resolve_collisions();
 
@@ -49,7 +50,6 @@ namespace wavy::sph {
         m_particles.resize(particle_count);
         m_particle_indices.resize(particle_count);
         m_particle_histogram = std::vector<std::atomic_int>(particle_count);
-        std::ranges::for_each(m_particle_histogram, [](auto& v) { v = 0; });
         reset_particles();
     }
 

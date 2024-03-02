@@ -45,6 +45,7 @@ namespace wavy::sph {
 
         const std::vector<particle>& get_particles() const { return m_particles; }
         particle_pattern get_pattern() const { return m_pattern; }
+        const std::vector<std::atomic_int>& get_cells() const { return m_particle_histogram; }
 
         float get_particle_radius() const { return m_particle_radius; }
         void set_particle_radius(float radius) { m_particle_radius = radius; }
