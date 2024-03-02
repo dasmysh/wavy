@@ -44,7 +44,9 @@ namespace wavy::sph {
         void draw_particle_info_gui();
         void draw_particle_info_table_rows(std::size_t index, const sph_solver::particle& particle);
         void draw_cell_info_gui();
-        void draw_cell_info_table_rows(std::size_t index, const std::atomic_int& cell);
+        void draw_cell_info_table_rows(std::size_t index, std::size_t cell_size);
+        void draw_cell_info_table_list_cells(std::size_t cell_offset, std::size_t cell_end);
+        void draw_cell_info_table_list_particles(const std::vector<std::size_t>& cell_particle_indices);
 
         glm::vec2 screen_to_simulation(const glm::vec2& screen_pos) const;
         glm::vec2 screen_to_render_area(const glm::vec2& screen_pos) const;
