@@ -131,6 +131,10 @@ namespace wavy::sph {
                 m_mouse_clicked = true;
                 m_selected_particle_index = static_cast<std::size_t>(-1);
             }
+
+            if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Right) {
+                m_selected_particle_index = static_cast<std::size_t>(-1);
+            }
         }
     }
 
