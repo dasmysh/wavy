@@ -26,6 +26,7 @@ namespace wavy::sph {
         , m_particles(initial_particle_count)
         , m_particle_indices(initial_particle_count)
         , m_particle_histogram(initial_particle_count)
+        , m_cell_offsets(initial_particle_count)
         , m_pattern{pattern}
     {
         reset_particles();
@@ -40,6 +41,8 @@ namespace wavy::sph {
         simulate_gravity(delta_t);
         resolve_collisions();
 
+        calculate_cell_offsets();
+        sort_particles_into_cells();
         // TODO
 
         update_densities();
@@ -50,6 +53,7 @@ namespace wavy::sph {
         m_particles.resize(particle_count);
         m_particle_indices.resize(particle_count);
         m_particle_histogram = std::vector<std::atomic_int>(particle_count);
+        m_cell_offsets.resize(particle_count);
         reset_particles();
     }
 
@@ -116,9 +120,52 @@ namespace wavy::sph {
                 particle.velocity.y *= -1.f * (1.f - m_collision_dampening);
             }
 
-            particle.grid_index = grid_hash(grid_cell(particle.position)) % m_particle_indices.size();
+            particle.grid_index = grid_hash(grid_cell(particle.position)) % m_particles.size();
             m_particle_histogram[particle.grid_index] += 1;
         });
+    }
+
+    void sph_solver::calculate_cell_offsets()
+    {
+        // TODO: emulate local / global split like in compute shaders using std::latch
+        // https://en.cppreference.com/w/cpp/thread/latch
+
+        // shared: uint localParticleCount, uint globalParticleBaseOffset;
+        // index == 0: localParticleCount = 0
+        // barrier, localParticleOffset = atomicAdd(localParticleCount, cellParticleCount), barrier
+        // localIndex == 0: globalParticleBaseOffset = atomicAdd(globalParticleCount, localParticleCount);
+        // barrier
+        // m_cell_offsets[index] = globalParticleBaseOffset + localParticleOffset;
+        // m_particle_histogram[index] = 0;???
+
+        std::atomic_int global_cell_count = 0;
+        auto enumerate_cells = utils::enumerate(m_particle_histogram);
+        std::for_each(std::execution::par, std::begin(enumerate_cells), std::end(enumerate_cells),
+                      [this, &global_cell_count](const auto& enumerated_cell_content_count) {
+                          auto index = std::get<0>(enumerated_cell_content_count);
+                          const auto& cell_content_count = std::get<1>(enumerated_cell_content_count).load();
+                          if (cell_content_count == 0) {
+                              m_cell_offsets[index] = 0;
+                              return;
+                          }
+
+                          auto cell_offset = global_cell_count.fetch_add(cell_content_count);
+                          m_cell_offsets[index] = cell_offset;
+                          m_particle_histogram[index] = 0;
+                      });
+    }
+
+    void sph_solver::sort_particles_into_cells()
+    {
+        auto enumerate_particles = utils::enumerate(m_particles);
+        std::for_each(std::execution::par, std::begin(enumerate_particles), std::end(enumerate_particles),
+                      [this](const auto& enumerated_particle) {
+                          auto index = std::get<0>(enumerated_particle);
+                          const auto& particle = std::get<1>(enumerated_particle);
+                          auto sorted_index = m_cell_offsets[particle.grid_index]
+                                              + m_particle_histogram[particle.grid_index].fetch_add(1);
+                          m_particle_indices[sorted_index] = index;
+                      });
     }
 
     void sph_solver::update_densities()

@@ -19,6 +19,14 @@
 #include <numeric>
 #include <execution>
 
+template<> struct std::hash<glm::uvec2>
+{
+    std::size_t operator()(const glm::uvec2& k) const
+    {
+        return wavy::sph::sph_solver::grid_hash(k);
+    }
+};
+
 namespace wavy::sph {
 
     sph::sph(const glm::vec2& sim_area)
@@ -439,8 +447,8 @@ namespace wavy::sph {
                                   ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY
                                       | ImGuiTableFlags_RowBg)) {
                 ImGui::TableSetupColumn("Grid Index");
-                ImGui::TableSetupColumn("Grid Cells");
                 ImGui::TableSetupColumn("Particle Count");
+                ImGui::TableSetupColumn("Grid Cells");
                 ImGui::TableSetupColumn("Particle Position");
                 ImGui::TableSetupColumn("Particle Velocity");
                 ImGui::TableSetupColumn("Particle Density");
@@ -448,7 +456,7 @@ namespace wavy::sph {
                 ImGui::TableSetupScrollFreeze(0, 1);
                 ImGui::TableHeadersRow();
 
-                for (const auto& [index, cell] : utils::enumerate(m_solver->get_cells())) {
+                for (const auto& [index, cell] : utils::enumerate(m_solver->get_cell_sizes())) {
                     draw_cell_info_table_rows(index, cell);
                 }
                 ImGui::EndTable();
@@ -457,31 +465,92 @@ namespace wavy::sph {
         }
     }
 
-    void sph::draw_cell_info_table_rows(std::size_t index, const std::atomic_int& cell)
+    void sph::draw_cell_info_table_rows(std::size_t index, const std::atomic_int& cell_size_atomic)
     {
+        std::unordered_map<glm::uvec2, std::vector<std::size_t>> grid_cell_to_particle_indices;
+        auto cell_offset = m_solver->get_cell_offsets()[index];
+        auto cell_size = static_cast<std::size_t>(cell_size_atomic.load());
+        auto cell_end = cell_offset + cell_size;
+        for (std::size_t particle_index_i = cell_offset; particle_index_i < cell_end; ++particle_index_i) {
+            auto particle_index = m_solver->get_particle_indices()[particle_index_i];
+            const auto& particle = m_solver->get_particles()[particle_index];
+            grid_cell_to_particle_indices[m_solver->grid_cell(particle.position)].push_back(particle_index);
+        }
+
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        if (ImGui::Selectable(fmt::format("{}", index).c_str(),
-                              index == m_selected_cell_index,
-                              ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
-            m_selected_cell_index = index;
+        ImGui::Text("%uz", index);
+        ImGui::TableNextColumn();
+        bool list_cells = false;
+        if (cell_size != 0) {
+            list_cells = ImGui::TreeNodeEx(fmt::format("{}-{}({})", cell_offset, cell_end, cell_size).c_str(),
+                                           ImGuiTreeNodeFlags_SpanFullWidth);
+        } else {
+            ImGui::Text("%uz-%uz(%uz)", cell_offset, cell_end, cell_size);
         }
+
         ImGui::TableNextColumn();
         // TODO: somehow get cell coordinates.
         // tree view for multiple
         // auto grid_cell = m_solver->grid_cell(particle.position);
         // ImGui::Text("(%u, %u)", grid_cell.x, grid_cell.y);
         ImGui::TableNextColumn();
-        ImGui::Text("%d", cell.load());
-        // TODO: tree view for particles.
         ImGui::TableNextColumn();
-        // ImGui::Text("(%f, %f)", particle.position.x, particle.position.y);
         ImGui::TableNextColumn();
-        // ImGui::Text("(%f, %f)", particle.velocity.x, particle.velocity.y);
         ImGui::TableNextColumn();
-        // ImGui::Text("%f", particle.density);
-        ImGui::TableNextColumn();
-        // ImGui::Text("%f", particle.property);
+
+        if (list_cells) {
+            for (const auto& [cell, cell_particle_indices] : grid_cell_to_particle_indices) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TableNextColumn();
+                if (auto cell_hash = sph_solver::grid_hash(cell); ImGui::Selectable(
+                        fmt::format("({}, {})", cell.x, cell.y).c_str(),
+                                      cell_hash == m_selected_cell_index,
+                                      ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
+                    m_selected_cell_index = cell_hash;
+                }
+                ImGui::TableNextColumn();
+                bool list_particles = false;
+                if (!cell_particle_indices.empty()) {
+                    list_particles =
+                        ImGui::TreeNodeEx(fmt::format("Particles: {}", cell_particle_indices.size()).c_str(),
+                                                   ImGuiTreeNodeFlags_SpanFullWidth);
+                } else {
+                    ImGui::Text("Particles: %uz", cell_particle_indices.size());
+                }
+                ImGui::TableNextColumn();
+                ImGui::TableNextColumn();
+                ImGui::TableNextColumn();
+                ImGui::TableNextColumn();
+
+                if (list_particles) {
+                    for (const auto& particle_index : cell_particle_indices) {
+                        const auto& particle = m_solver->get_particles()[particle_index];
+                        ImGui::TreeNodeEx("idk",
+                                          ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet
+                                              | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanFullWidth);
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TableNextColumn();
+                        ImGui::TableNextColumn();
+                        ImGui::TableNextColumn();
+                        ImGui::Text("(%f, %f)", particle.position.x, particle.position.y);
+                        ImGui::TableNextColumn();
+                        ImGui::Text("(%f, %f)", particle.velocity.x, particle.velocity.y);
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%f", particle.density);
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%f", particle.property);
+
+                        // TODO: particle index???
+                    }
+
+                    ImGui::TreePop();
+                }
+            }
+            ImGui::TreePop();
+        }
     }
 
     glm::vec2 sph::screen_to_simulation(const glm::vec2& screen_pos) const
