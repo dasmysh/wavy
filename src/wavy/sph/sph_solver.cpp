@@ -68,8 +68,8 @@ namespace wavy::sph {
     {
         if (m_pattern == particle_pattern::random) {
             std::mt19937 eng{ seed };
-            std::uniform_real_distribution<float> distr_x(m_particle_radius, m_simulation_area.x - m_particle_radius);
-            std::uniform_real_distribution<float> distr_y(m_particle_radius, m_simulation_area.y - m_particle_radius);
+            std::uniform_real_distribution<float> distr_x(0.f, m_simulation_area.x);
+            std::uniform_real_distribution<float> distr_y(0.f, m_simulation_area.y);
 
             std::ranges::for_each(m_particles, [this, &distr_x, &distr_y, &eng](auto& prtcl) {
                 prtcl = particle{glm::vec2{distr_x(eng), distr_y(eng)}};
@@ -104,20 +104,20 @@ namespace wavy::sph {
     void sph_solver::resolve_collisions()
     {
         std::for_each(std::execution::par, std::begin(m_particles), std::end(m_particles), [this](auto& particle) {
-            if (particle.position.x < m_particle_radius) {
-                particle.position.x = m_particle_radius;
+            if (particle.position.x < 0.f) {
+                particle.position.x = 0.f;
                 particle.velocity.x *= -1.f * (1.f - m_collision_dampening);
             }
-            if (particle.position.x > m_simulation_area.x - m_particle_radius) {
-                particle.position.x = m_simulation_area.x - m_particle_radius;
+            if (particle.position.x > m_simulation_area.x) {
+                particle.position.x = m_simulation_area.x;
                 particle.velocity.x *= -1.f * (1.f - m_collision_dampening);
             }
-            if (particle.position.y < m_particle_radius) {
-                particle.position.y = m_particle_radius;
+            if (particle.position.y < 0.f) {
+                particle.position.y = 0.f;
                 particle.velocity.y *= -1.f * (1.f - m_collision_dampening);
             }
-            if (particle.position.y > m_simulation_area.y - m_particle_radius) {
-                particle.position.y = m_simulation_area.y - m_particle_radius;
+            if (particle.position.y > m_simulation_area.y) {
+                particle.position.y = m_simulation_area.y;
                 particle.velocity.y *= -1.f * (1.f - m_collision_dampening);
             }
 
@@ -170,7 +170,8 @@ namespace wavy::sph {
 
                           inits_done[emulated_mp_index]->arrive_and_wait();
 
-                          m_cell_offsets[global_index] = global_cell_offsets[emulated_mp_index] + local_particle_offset;
+                          auto cell_offset = global_cell_offsets[emulated_mp_index] + local_particle_offset;
+                          m_cell_offsets[global_index] = cell_offset;
                           m_particle_histogram[global_index] = 0;
                       });
     }
@@ -190,16 +191,17 @@ namespace wavy::sph {
 
     void sph_solver::update_densities()
     {
-        std::for_each(std::execution::par, std::begin(m_particles), std::end(m_particles),
-                      [this](auto& particle) { particle.density = calculate_density(particle.position); });
+        std::for_each(std::execution::seq, std::begin(m_particles), std::end(m_particles), [this](auto& particle) {
+            particle.density = calculate_density(particle.position);
+        });
     }
 
-    glm::uvec2 sph_solver::grid_cell(const glm::vec2& p) const
+    glm::ivec2 sph_solver::grid_cell(const glm::vec2& p) const
     {
         return glm::uvec2{glm::floor(p / m_particle_radius)};
     }
 
-    std::size_t sph_solver::grid_hash(const glm::uvec2& cell)
+    std::size_t sph_solver::grid_hash(const glm::ivec2& cell)
     {
         constexpr std::size_t prime_x = 94847;
         constexpr std::size_t prime_y = 31699;
@@ -210,12 +212,26 @@ namespace wavy::sph {
     {
         float density = 0.f;
 
-        // TODO: only iterate over nearby particles
-        std::ranges::for_each(m_particles, [this, &density, &p](auto& particle) {
-            float r = glm::length(particle.position - p);
-            float influence = density_kernel(r);
-            density += m_particle_mass * influence;
-        });
+        auto center_cell = grid_cell(p);
+        for (int y_off = -1; y_off <= 1; ++y_off) {
+            for (int x_off = -1; x_off <= 1; ++x_off) {
+                auto current_grid_cell = center_cell + glm::ivec2{x_off, y_off};
+                auto cell_hash = grid_hash(current_grid_cell) % m_particles.size();
+                auto cell_size = static_cast<std::size_t>(m_particle_histogram[cell_hash].load());
+                auto cell_offset = m_cell_offsets[cell_hash];
+                auto cell_end = cell_offset + cell_size;
+
+                for (auto particle_index = cell_offset; particle_index < cell_end; ++particle_index) {
+                    const auto& particle = m_particles[m_particle_indices[particle_index]];
+                    auto particle_cell = grid_cell(particle.position);
+                    auto particle_cell_hash = grid_hash(particle_cell) % m_particles.size();
+                    assert(particle_cell_hash == cell_hash);
+                    float r = glm::length(particle.position - p);
+                    float influence = density_kernel(r);
+                    density += m_particle_mass * influence;
+                }
+            }
+        }
 
         return density;
     }

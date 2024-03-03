@@ -66,8 +66,8 @@ namespace wavy::sph {
         float property_kernel(float r) const;
         float calculate_density(const glm::vec2& p) const;
         float calculate_property(const glm::vec2& p) const;
-        glm::uvec2 grid_cell(const glm::vec2& p) const;
-        static std::size_t grid_hash(const glm::uvec2& cell);
+        glm::ivec2 grid_cell(const glm::vec2& p) const;
+        static std::size_t grid_hash(const glm::ivec2& cell);
 
     private:
         void simulate_gravity(float delta_t);
