@@ -478,10 +478,10 @@ namespace wavy::sph {
         ImGui::TableNextColumn();
         bool list_cells = false;
         if (cell_size != 0) {
-            list_cells = ImGui::TreeNodeEx(fmt::format("{}-{}({})", cell_offset, cell_end, cell_size).c_str(),
+            list_cells = ImGui::TreeNodeEx(fmt::format("{}: {}-{}###cnt{}", cell_size, cell_offset, cell_end, index).c_str(),
                                            ImGuiTreeNodeFlags_SpanFullWidth);
         } else {
-            ImGui::Text("%zu-%zu(%zu)", cell_offset, cell_end, cell_size);
+            ImGui::Text("%zu: %zu-%zu", cell_size, cell_offset, cell_end, index);
         }
 
         ImGui::TableNextColumn();
