@@ -76,6 +76,9 @@ namespace wavy::sph {
         void sort_particles_into_cells();
         void update_densities();
 
+        template<typename Ret, typename Pred>
+        Ret accumulate_over_neighbourhood(const glm::vec2& p, const Ret& start_value, Pred predicate) const;
+
 
         static float calc_property(const glm::vec2& p);
 

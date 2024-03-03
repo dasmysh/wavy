@@ -208,9 +208,10 @@ namespace wavy::sph {
         return cell.x * prime_x + cell.y * prime_y;
     }
 
-    float sph_solver::calculate_density(const glm::vec2& p) const
+    template<typename Ret, typename Pred>
+    Ret sph_solver::accumulate_over_neighbourhood(const glm::vec2& p, const Ret& start_value, Pred predicate) const
     {
-        float density = 0.f;
+        Ret value = start_value;
 
         auto center_cell = grid_cell(p);
         for (int y_off = -1; y_off <= 1; ++y_off) {
@@ -223,32 +224,31 @@ namespace wavy::sph {
 
                 for (auto particle_index = cell_offset; particle_index < cell_end; ++particle_index) {
                     const auto& particle = m_particles[m_particle_indices[particle_index]];
-                    auto particle_cell = grid_cell(particle.position);
-                    auto particle_cell_hash = grid_hash(particle_cell) % m_particles.size();
-                    assert(particle_cell_hash == cell_hash);
-                    float r = glm::length(particle.position - p);
-                    float influence = density_kernel(r);
-                    density += m_particle_mass * influence;
+                    value += predicate(particle);
                 }
             }
         }
 
-        return density;
+        return value;
+    }
+
+    float sph_solver::calculate_density(const glm::vec2& p) const
+    {
+        return accumulate_over_neighbourhood(p, 0.f, [this, &p](const auto& particle) {
+            float r = glm::length(particle.position - p);
+            float influence = density_kernel(r);
+            return m_particle_mass * influence;
+        });
     }
 
     float sph_solver::calculate_property(const glm::vec2& p) const
     {
-        float property = 0.f;
-
-        // TODO: only iterate over nearby particles
-        std::ranges::for_each(m_particles, [this, &property, &p](auto& particle) {
+        return accumulate_over_neighbourhood(p, 0.f, [this, &p](const auto& particle) {
             float r = glm::length(particle.position - p);
             float influence = property_kernel(r);
             float density = particle.density;
-            property += particle.property * m_particle_mass * influence / density;
+            return particle.property * m_particle_mass * influence / density;
         });
-
-        return property;
     }
 
     float sph_solver::density_kernel(float r) const
