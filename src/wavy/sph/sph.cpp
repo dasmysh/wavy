@@ -143,6 +143,7 @@ namespace wavy::sph {
 
             if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Right) {
                 m_selected_particle_index = static_cast<std::size_t>(-1);
+                m_selected_cell_hash = static_cast<std::size_t>(-1);
             }
         }
     }
@@ -192,12 +193,12 @@ namespace wavy::sph {
         auto grid_size = simulation_to_render_area(glm::vec2{m_solver->get_particle_radius(), m_simulation_size.y - m_solver->get_particle_radius()});
         sf::Color line_color{150, 150, 150, 100};
 
-        sf::RectangleShape line_horizontal{sf::Vector2f(m_render_size.x, line_thickness)};
+        sf::RectangleShape line_horizontal{sf::Vector2f{m_render_size.x, line_thickness}};
         line_horizontal.setOrigin(-render_area_to_screen(glm::vec2{0.f}).x, .5f * line_thickness);
         line_horizontal.setOutlineColor(line_color);
         line_horizontal.setFillColor(line_color);
 
-        sf::RectangleShape line_vertical{sf::Vector2f(line_thickness, m_render_size.y)};
+        sf::RectangleShape line_vertical{sf::Vector2f{line_thickness, m_render_size.y}};
         line_vertical.setOrigin(.5f * line_thickness,
                                 -render_area_to_screen(glm::vec2{0.f}).y);
         line_vertical.setOutlineColor(line_color);
@@ -219,6 +220,37 @@ namespace wavy::sph {
             rt.draw(line_vertical);
             x_line += grid_size.x;
         }
+
+        sf::RectangleShape selected_cell_highlight{
+            sf::Vector2f{grid_size.x - 2.f * line_thickness, grid_size.y - 2.f * line_thickness}};
+        selected_cell_highlight.setOutlineColor(sf::Color::Red);
+        selected_cell_highlight.setOutlineThickness(line_thickness);
+        selected_cell_highlight.setFillColor(sf::Color::Transparent);
+        selected_cell_highlight.setOrigin(-line_thickness, grid_size.y - line_thickness);
+
+        auto screen_view = rt.getView();
+        auto render_area_view = screen_view;
+        render_area_view.setSize(m_render_size.x, m_render_size.y);
+        render_area_view.setViewport(sf::FloatRect{.05f, .05f, .9f, .9f});
+        rt.setView(render_area_view);
+
+        auto start_cell = m_solver->grid_cell(glm::vec2{0.f});
+        auto end_cell = m_solver->grid_cell(m_simulation_size);
+
+        for (int iy = start_cell.y; iy <= end_cell.y; ++iy) {
+            for (int ix = start_cell.x; ix <= end_cell.x; ++ix) {
+                auto cell_hash = sph_solver::grid_hash(glm::ivec2{ix, iy});
+                if (m_selected_cell_hash == cell_hash) {
+                    glm::vec2 simulation_position{static_cast<float>(ix) * m_solver->get_particle_radius(),
+                                                  static_cast<float>(iy) * m_solver->get_particle_radius()};
+                    auto screen_position = simulation_to_screen(simulation_position);
+                    selected_cell_highlight.setPosition(screen_position.x, screen_position.y);
+                    rt.draw(selected_cell_highlight);
+                }
+            }
+        }
+
+        rt.setView(screen_view);
     }
 
     void sph::update_smoothing_kernels()
@@ -511,9 +543,9 @@ namespace wavy::sph {
             ImGui::TableNextColumn();
             ImGui::TableNextColumn();
             if (auto cell_hash = sph_solver::grid_hash(cell);
-                ImGui::Selectable(fmt::format("[{}, {}]", cell.x, cell.y).c_str(), cell_hash == m_selected_cell_index,
+                ImGui::Selectable(fmt::format("[{}, {}]", cell.x, cell.y).c_str(), cell_hash == m_selected_cell_hash,
                                   ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
-                m_selected_cell_index = cell_hash;
+                m_selected_cell_hash = cell_hash;
             }
             ImGui::TableNextColumn();
             bool list_particles = false;
