@@ -44,9 +44,11 @@ namespace wavy::sph {
 
         calculate_cell_offsets();
         sort_particles_into_cells();
-        // TODO
 
         update_densities();
+
+        apply_pressure(delta_t);
+        // TODO
     }
 
     void sph_solver::set_particle_count(std::size_t particle_count)
@@ -67,7 +69,7 @@ namespace wavy::sph {
     void sph_solver::reset_particles(unsigned int seed /*= 1337*/)
     {
         if (m_pattern == particle_pattern::random) {
-            std::mt19937 eng{ seed };
+            std::mt19937 eng{seed};
             std::uniform_real_distribution<float> distr_x(0.f, m_simulation_area.x);
             std::uniform_real_distribution<float> distr_y(0.f, m_simulation_area.y);
 
@@ -87,7 +89,7 @@ namespace wavy::sph {
                 auto& prtcl = std::get<1>(enum_particle);
                 prtcl = particle{pos_offset + glm::vec2{x, y} * m_particle_radius};
                 prtcl.property = calc_property(prtcl.position);
-                });
+            });
         }
     }
 
@@ -96,9 +98,9 @@ namespace wavy::sph {
         float delta_gravity = m_gravity * delta_t;
         std::for_each(std::execution::par, std::begin(m_particles), std::end(m_particles),
                       [delta_gravity, delta_t](auto& particle) {
-            particle.velocity += glm::vec2{0.f, -1.f} * delta_gravity;
-            particle.position += particle.velocity * delta_t;
-        });
+                          particle.velocity += glm::vec2{0.f, -1.f} * delta_gravity;
+                          particle.position += particle.velocity * delta_t;
+                      });
     }
 
     void sph_solver::resolve_collisions()
@@ -191,9 +193,18 @@ namespace wavy::sph {
 
     void sph_solver::update_densities()
     {
-        std::for_each(std::execution::seq, std::begin(m_particles), std::end(m_particles), [this](auto& particle) {
-            particle.density = calculate_density(particle.position);
-        });
+        std::for_each(std::execution::seq, std::begin(m_particles), std::end(m_particles),
+                      [this](auto& particle) { particle.density = calculate_density(particle.position); });
+    }
+
+    void sph_solver::apply_pressure(float delta_t)
+    {
+        std::for_each(std::execution::seq, std::begin(m_particles), std::end(m_particles),
+                      [this, delta_t](auto& particle) {
+                          auto pressure_force = calculate_pressure_force(particle.position);
+                          auto pressure_acceleration = pressure_force / particle.density;
+                          particle.velocity += pressure_acceleration * delta_t;
+                      });
     }
 
     glm::ivec2 sph_solver::grid_cell(const glm::vec2& p) const
@@ -223,8 +234,7 @@ namespace wavy::sph {
                 auto cell_end = cell_offset + cell_size;
 
                 for (auto particle_index = cell_offset; particle_index < cell_end; ++particle_index) {
-                    const auto& particle = m_particles[m_particle_indices[particle_index]];
-                    value += predicate(particle);
+                    value += predicate(particle_index);
                 }
             }
         }
@@ -234,41 +244,134 @@ namespace wavy::sph {
 
     float sph_solver::calculate_density(const glm::vec2& p) const
     {
-        return accumulate_over_neighbourhood(p, 0.f, [this, &p](const auto& particle) {
-            float r = glm::length(particle.position - p);
-            float influence = density_kernel(r);
-            return m_particle_mass * influence;
+        return accumulate_over_neighbourhood(p, 0.f, [this, &p](auto other_particle_index) {
+            return calculate_density_internal(p, m_particles[other_particle_index]);
+        });
+    }
+
+    float sph_solver::calculate_density(std::size_t particle_index) const
+    {
+        const auto& p = m_particles[particle_index].position;
+        return accumulate_over_neighbourhood(p, 0.f, [this, &p, &particle_index](auto other_particle_index) {
+            if (particle_index == other_particle_index) { return 0.f; }
+            return calculate_density_internal(p, m_particles[other_particle_index]);
         });
     }
 
     float sph_solver::calculate_property(const glm::vec2& p) const
     {
-        return accumulate_over_neighbourhood(p, 0.f, [this, &p](const auto& particle) {
-            float r = glm::length(particle.position - p);
-            float influence = property_kernel(r);
-            float density = particle.density;
-            return particle.property * m_particle_mass * influence / density;
+        return accumulate_over_neighbourhood(p, 0.f, [this, &p](auto other_particle_index) {
+            return calculate_property_internal(p, m_particles[other_particle_index]);
+        });
+    }
+
+    float sph_solver::calculate_property(std::size_t particle_index) const
+    {
+        const auto& p = m_particles[particle_index].position;
+        return accumulate_over_neighbourhood(p, 0.f, [this, &p, &particle_index](auto other_particle_index) {
+            if (particle_index == other_particle_index) { return 0.f; }
+            return calculate_property_internal(p, m_particles[other_particle_index]);
+        });
+    }
+
+    glm::vec2 sph_solver::calculate_property_gradient(const glm::vec2& p) const
+    {
+        return accumulate_over_neighbourhood(p, glm::vec2{0.f}, [this, &p](auto other_particle_index) {
+            return calculate_property_internal(p, m_particles[other_particle_index]);
+        });
+    }
+
+    glm::vec2 sph_solver::calculate_property_gradient(std::size_t particle_index) const
+    {
+        const auto& p = m_particles[particle_index].position;
+        return accumulate_over_neighbourhood(p, glm::vec2{0.f}, [this, &p, &particle_index](auto other_particle_index) {
+            if (particle_index == other_particle_index) { return glm::vec2{0.f}; }
+            return calculate_property_gradient_internal(p, m_particles[other_particle_index]);
+        });
+    }
+
+    glm::vec2 sph_solver::calculate_pressure_force(const glm::vec2& p) const
+    {
+        return accumulate_over_neighbourhood(p, glm::vec2{0.f}, [this, &p](auto other_particle_index) {
+            return calculate_pressure_force_internal(p, m_particles[other_particle_index]);
+        });
+    }
+
+    glm::vec2 sph_solver::calculate_pressure_force(std::size_t particle_index) const
+    {
+        const auto& p = m_particles[particle_index].position;
+        return accumulate_over_neighbourhood(p, glm::vec2{0.f}, [this, &p, &particle_index](auto other_particle_index) {
+            if (particle_index == other_particle_index) { return glm::vec2{0.f}; }
+            return calculate_pressure_force_internal(p, m_particles[other_particle_index]);
         });
     }
 
     float sph_solver::density_kernel(float r) const
     {
-        float volume = glm::pi<float>() * glm::pow(m_particle_radius, 8.f) / 4.f;
-        float value = glm::max(0.f, m_particle_radius * m_particle_radius - r * r);
+        auto volume = glm::pi<float>() * glm::pow(m_particle_radius, 8.f) / 4.f;
+        auto value = glm::max(0.f, m_particle_radius * m_particle_radius - r * r);
         return value * value * value / volume;
     }
 
     float sph_solver::property_kernel(float r) const
     {
         // TODO: same as density for now.
-        float volume = glm::pi<float>() * glm::pow(m_particle_radius, 8.f) / 4.f;
-        float value = glm::max(0.f, m_particle_radius * m_particle_radius - r * r);
+        auto volume = glm::pi<float>() * glm::pow(m_particle_radius, 8.f) / 4.f;
+        auto value = glm::max(0.f, m_particle_radius * m_particle_radius - r * r);
         return value * value * value / volume;
+    }
+
+    float sph_solver::property_kernel_derivative(float r) const
+    {
+        auto f = glm::max(0.f, m_particle_radius * m_particle_radius - r * r);
+        auto scale = -24.f / (glm::pi<float>() * glm::pow(m_particle_radius, 8.f));
+        return scale * r * f * f;
+    }
+
+    float sph_solver::density_to_pressure(float density) const
+    {
+        auto density_error = density - m_target_density;
+        return density_error * m_pressure_multiplier;
     }
 
     float sph_solver::calc_property(const glm::vec2& p)
     {
         return glm::cos(p.y - 3.f + glm::sin(p.x));
+    }
+
+    float sph_solver::calculate_density_internal(const glm::vec2& p, const particle& particle) const
+    {
+        auto r = glm::length(particle.position - p);
+        auto influence = density_kernel(r);
+        return m_particle_mass * influence;
+    }
+
+    float sph_solver::calculate_property_internal(const glm::vec2& p, const particle& particle) const
+    {
+        auto r = glm::length(particle.position - p);
+        auto influence = property_kernel(r);
+        auto density = particle.density;
+        return particle.property * m_particle_mass * influence / density;
+    }
+
+    glm::vec2 sph_solver::calculate_property_gradient_internal(const glm::vec2& p, const particle& particle) const
+    {
+        auto dir = particle.position - p;
+        auto r = glm::length(dir);
+        dir /= r;
+        auto slope = property_kernel_derivative(r);
+        auto density = particle.density;
+        return -particle.property * dir * slope * m_particle_mass / density;
+    }
+
+    glm::vec2 sph_solver::calculate_pressure_force_internal(const glm::vec2& p, const particle& particle) const
+    {
+        auto dir = particle.position - p;
+        auto r = glm::length(dir);
+        dir /= r;
+        auto slope = property_kernel_derivative(r);
+        auto density = particle.density;
+        return -density_to_pressure(density) * dir * slope * m_particle_mass / density;
     }
 
 }

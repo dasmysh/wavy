@@ -61,11 +61,20 @@ namespace wavy::sph {
         float get_collision_dampening() const { return m_collision_dampening; }
         void set_collision_dampening(float collision_dampening) { m_collision_dampening = collision_dampening; }
 
+        float get_target_density() const { return m_target_density; }
+        void set_target_density(float target_density) { m_target_density = target_density; }
+
+        float get_pressure_multiplier() const { return m_pressure_multiplier; }
+        void set_pressure_multiplier(float pressure_multiplier) { m_pressure_multiplier = pressure_multiplier; }
+
         // public for visualization.
         float density_kernel(float r) const;
         float property_kernel(float r) const;
+        float property_kernel_derivative(float r) const;
         float calculate_density(const glm::vec2& p) const;
         float calculate_property(const glm::vec2& p) const;
+        glm::vec2 calculate_property_gradient(const glm::vec2& p) const;
+        glm::vec2 calculate_pressure_force(const glm::vec2& p) const;
         glm::ivec2 grid_cell(const glm::vec2& p) const;
         static std::size_t grid_hash(const glm::ivec2& cell);
 
@@ -75,10 +84,21 @@ namespace wavy::sph {
         void calculate_cell_offsets();
         void sort_particles_into_cells();
         void update_densities();
+        void apply_pressure(float delta_t);
 
         template<typename Ret, typename Pred>
         Ret accumulate_over_neighbourhood(const glm::vec2& p, const Ret& start_value, Pred predicate) const;
+        float calculate_density(std::size_t particle_index) const;
+        float calculate_property(std::size_t particle_index) const;
+        glm::vec2 calculate_property_gradient(std::size_t particle_index) const;
+        glm::vec2 calculate_pressure_force(std::size_t particle_index) const;
 
+        float calculate_density_internal(const glm::vec2& p, const particle& particle) const;
+        float calculate_property_internal(const glm::vec2& p, const particle& particle) const;
+        glm::vec2 calculate_property_gradient_internal(const glm::vec2& p, const particle& particle) const;
+        glm::vec2 calculate_pressure_force_internal(const glm::vec2& p, const particle& particle) const;
+
+        float density_to_pressure(float density) const;
 
         static float calc_property(const glm::vec2& p);
 
@@ -90,6 +110,8 @@ namespace wavy::sph {
         particle_pattern m_pattern;
         float m_particle_radius = 20.f;
         float m_particle_mass = 1.f;
+        float m_target_density = 2.75f;
+        float m_pressure_multiplier = .5f;
 
         float m_gravity = 0.f;// 9.81f;
         float m_collision_dampening = .1f;
