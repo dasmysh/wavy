@@ -88,7 +88,6 @@ namespace wavy::sph {
 
         template<typename Ret, typename Pred>
         Ret accumulate_over_neighbourhood(const glm::vec2& p, const Ret& start_value, Pred predicate) const;
-        float calculate_density(std::size_t particle_index) const;
         float calculate_property(std::size_t particle_index) const;
         glm::vec2 calculate_property_gradient(std::size_t particle_index) const;
         glm::vec2 calculate_pressure_force(std::size_t particle_index) const;

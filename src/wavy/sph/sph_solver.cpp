@@ -193,15 +193,16 @@ namespace wavy::sph {
 
     void sph_solver::update_densities()
     {
-        std::for_each(std::execution::seq, std::begin(m_particles), std::end(m_particles),
+        std::for_each(std::execution::par, std::begin(m_particles), std::end(m_particles),
                       [this](auto& particle) { particle.density = calculate_density(particle.position); });
     }
 
     void sph_solver::apply_pressure(float delta_t)
     {
-        std::for_each(std::execution::seq, std::begin(m_particles), std::end(m_particles),
-                      [this, delta_t](auto& particle) {
-                          auto pressure_force = calculate_pressure_force(particle.position);
+        std::for_each(std::execution::par, std::begin(m_particle_indices), std::end(m_particle_indices),
+                      [this, delta_t](auto particle_index) {
+                          auto& particle = m_particles[particle_index];
+                          auto pressure_force = calculate_pressure_force(particle_index);
                           auto pressure_acceleration = pressure_force / particle.density;
                           particle.velocity += pressure_acceleration * delta_t;
                       });
@@ -234,7 +235,7 @@ namespace wavy::sph {
                 auto cell_end = cell_offset + cell_size;
 
                 for (auto particle_index = cell_offset; particle_index < cell_end; ++particle_index) {
-                    value += predicate(particle_index);
+                    value += predicate(m_particle_indices[particle_index]);
                 }
             }
         }
@@ -245,15 +246,6 @@ namespace wavy::sph {
     float sph_solver::calculate_density(const glm::vec2& p) const
     {
         return accumulate_over_neighbourhood(p, 0.f, [this, &p](auto other_particle_index) {
-            return calculate_density_internal(p, m_particles[other_particle_index]);
-        });
-    }
-
-    float sph_solver::calculate_density(std::size_t particle_index) const
-    {
-        const auto& p = m_particles[particle_index].position;
-        return accumulate_over_neighbourhood(p, 0.f, [this, &p, &particle_index](auto other_particle_index) {
-            if (particle_index == other_particle_index) { return 0.f; }
             return calculate_density_internal(p, m_particles[other_particle_index]);
         });
     }

@@ -396,6 +396,16 @@ namespace wavy::sph {
                 m_update_scalar_field = true;
             }
 
+            if (auto target_density = m_solver->get_target_density();
+                ImGui::SliderFloat("Target Density", &target_density, .1f, 10.f)) {
+                m_solver->set_target_density(target_density);
+            }
+
+            if (auto pressure_multiplier = m_solver->get_pressure_multiplier();
+                ImGui::SliderFloat("Pressure Multiplier", &pressure_multiplier, .1f, 10.f)) {
+                m_solver->set_pressure_multiplier(pressure_multiplier);
+            }
+
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
