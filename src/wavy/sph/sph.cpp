@@ -355,85 +355,108 @@ namespace wavy::sph {
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (auto particle_count = static_cast<int>(m_solver->get_particles().size());
-                ImGui::InputInt("Particle Count", &particle_count)) {
-                m_solver->set_particle_count(static_cast<std::size_t>(particle_count));
-                m_update_scalar_field = true;
-                m_selected_particle_index = static_cast<std::size_t>(-1);
-            }
-
-            std::array<const char*, 2> pattern_names{"random", "centered_grid"};
-            if (auto current_pattern = static_cast<int>(m_solver->get_pattern()); ImGui::Combo(
-                    "Pattern", &current_pattern, pattern_names.data(), static_cast<int>(pattern_names.size()))) {
-                m_solver->set_particle_pattern(static_cast<particle_pattern>(current_pattern));
-                m_update_scalar_field = true;
-                m_selected_particle_index = static_cast<std::size_t>(-1);
-            }
-
-            static int seed = 1337;
-            if (m_solver->get_pattern() == particle_pattern::random) { ImGui::InputInt("Seed", &seed, 0); }
-
-            if (ImGui::Button("Reset Particles")) {
-                m_solver->reset_particles(seed);
-                m_update_scalar_field = true;
-                m_selected_particle_index = static_cast<std::size_t>(-1);
-            }
+            draw_simulation_settings_gui();
 
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (auto particle_radius = m_solver->get_particle_radius();
-                ImGui::SliderFloat("Particle Radius", &particle_radius, .001f, 500.f)) {
-                m_solver->set_particle_radius(particle_radius);
-                update_smoothing_kernels();
-                m_update_scalar_field = true;
-            }
+            draw_particle_settings_gui();
 
-            if (auto particle_mass = m_solver->get_particle_mass();
-                ImGui::SliderFloat("Particle Mass", &particle_mass, .001f, 100.f)) {
-                m_solver->set_particle_mass(particle_mass);
-                m_update_scalar_field = true;
-            }
-
-            if (auto target_density = m_solver->get_target_density();
-                ImGui::SliderFloat("Target Density", &target_density, .1f, 10.f)) {
-                m_solver->set_target_density(target_density);
-            }
-
-            if (auto pressure_multiplier = m_solver->get_pressure_multiplier();
-                ImGui::SliderFloat("Pressure Multiplier", &pressure_multiplier, .1f, 10.f)) {
-                m_solver->set_pressure_multiplier(pressure_multiplier);
-            }
 
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (auto gravity = m_solver->get_gravity(); ImGui::SliderFloat("Gravity", &gravity, .0f, 100.f)) {
-                m_solver->set_gravity(gravity);
-            }
+            draw_physical_settings_gui();
 
-            if (auto collision_dampening = m_solver->get_collision_dampening();
-                ImGui::SliderFloat("Collision Dampening", &collision_dampening, .0f, 1.f)) {
-                m_solver->set_collision_dampening(collision_dampening);
-            }
 
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
 
-            if (bool visualize_scalar = m_visualize_scalar != -1;
-                ImGui::Checkbox("Visualize Density Field", &visualize_scalar)) {
-                m_visualize_scalar = visualize_scalar ? 0 : -1;
-            }
+            draw_scalar_visualization_settings_gui();
 
-            if (m_visualize_scalar != -1) {
-                ImGui::Checkbox("As Field", &m_show_scalar_field_texture);
-                m_update_scalar_field |= ImGui::RadioButton("Density", &m_visualize_scalar, 0);
-                m_update_scalar_field |= ImGui::RadioButton("Dummy Property", &m_visualize_scalar, 1);
-            }
             ImGui::EndTabItem();
+        }
+    }
+
+    void sph::draw_simulation_settings_gui()
+    {
+        if (auto particle_count = static_cast<int>(m_solver->get_particles().size());
+            ImGui::InputInt("Particle Count", &particle_count)) {
+            m_solver->set_particle_count(static_cast<std::size_t>(particle_count));
+            m_update_scalar_field = true;
+            m_selected_particle_index = static_cast<std::size_t>(-1);
+        }
+
+        std::array<const char*, 2> pattern_names{"random", "centered_grid"};
+        if (auto current_pattern = static_cast<int>(m_solver->get_pattern());
+            ImGui::Combo("Pattern", &current_pattern, pattern_names.data(), static_cast<int>(pattern_names.size()))) {
+            m_solver->set_particle_pattern(static_cast<particle_pattern>(current_pattern));
+            m_update_scalar_field = true;
+            m_selected_particle_index = static_cast<std::size_t>(-1);
+        }
+
+        static int seed = 1337;
+        if (m_solver->get_pattern() == particle_pattern::random) { ImGui::InputInt("Seed", &seed, 0); }
+
+        if (ImGui::Button("Reset Particles")) {
+            m_solver->reset_particles(seed);
+            m_update_scalar_field = true;
+            m_selected_particle_index = static_cast<std::size_t>(-1);
+        }
+    }
+
+    void sph::draw_particle_settings_gui()
+    {
+        if (auto particle_radius = m_solver->get_config().get_particle_radius();
+            ImGui::SliderFloat("Particle Radius", &particle_radius, .1f, 500.f)) {
+            m_solver->get_config().set_particle_radius(particle_radius);
+            update_smoothing_kernels();
+            m_update_scalar_field = true;
+        }
+
+        if (auto particle_mass = m_solver->get_config().get_particle_mass();
+            ImGui::SliderFloat("Particle Mass", &particle_mass, .001f, 100.f)) {
+            m_solver->get_config().set_particle_mass(particle_mass);
+            m_update_scalar_field = true;
+        }
+    }
+
+    void sph::draw_physical_settings_gui()
+    {
+        if (auto gravity = m_solver->get_config().get_gravity(); ImGui::SliderFloat("Gravity", &gravity, .0f, 100.f)) {
+            m_solver->get_config().set_gravity(gravity);
+        }
+
+        if (auto collision_dampening = m_solver->get_config().get_collision_dampening();
+            ImGui::SliderFloat("Collision Dampening", &collision_dampening, .0f, 1.f)) {
+            m_solver->get_config().set_collision_dampening(collision_dampening);
+        }
+
+        if (auto target_density = m_solver->get_config().get_target_density();
+            ImGui::SliderFloat("Target Density", &target_density, .001f, 10.f)) {
+            m_solver->get_config().set_target_density(target_density);
+        }
+
+        if (auto pressure_multiplier = m_solver->get_config().get_pressure_multiplier();
+            ImGui::SliderFloat("Pressure Multiplier", &pressure_multiplier, .1f, 10.f)) {
+            m_solver->get_config().set_pressure_multiplier(pressure_multiplier);
+        }
+    }
+
+    void sph::draw_scalar_visualization_settings_gui()
+    {
+        if (bool visualize_scalar = m_visualize_scalar != -1;
+            ImGui::Checkbox("Visualize Density Field", &visualize_scalar)) {
+            m_visualize_scalar = visualize_scalar ? 0 : -1;
+        }
+
+        if (m_visualize_scalar != -1) {
+            ImGui::Checkbox("As Field", &m_show_scalar_field_texture);
+            m_update_scalar_field |= ImGui::RadioButton("Density", &m_visualize_scalar, 0);
+            m_update_scalar_field |= ImGui::RadioButton("Dummy Property", &m_visualize_scalar, 1);
         }
     }
 

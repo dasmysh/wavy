@@ -41,6 +41,11 @@ namespace wavy::sph {
         sf::Color calculate_scalar_color_at(const glm::vec2& sim_position, std::size_t i, float scale) const;
 
         void draw_settings_gui();
+        void draw_simulation_settings_gui();
+        void draw_particle_settings_gui();
+        void draw_physical_settings_gui();
+        void draw_scalar_visualization_settings_gui();
+
         void draw_particle_info_gui();
         void draw_particle_info_table_rows(std::size_t index, const sph_solver::particle& particle);
         void draw_cell_info_gui();
