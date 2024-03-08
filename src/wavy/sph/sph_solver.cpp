@@ -78,7 +78,7 @@ namespace wavy::sph {
             });
         } else if (m_pattern == particle_pattern::centered_grid) {
             auto grid_width = glm::ceil(glm::sqrt(static_cast<float>(m_particles.size())));
-            auto pos_offset = .5f * (m_simulation_area - grid_width * m_particle_radius);
+            auto pos_offset = .5f * (m_simulation_area - grid_width * m_config.get_particle_radius());
 
             std::ranges::for_each(utils::enumerate(m_particles), [this, grid_width, &pos_offset](auto enum_particle) {
                 auto i = static_cast<float>(std::get<0>(enum_particle));
@@ -86,7 +86,7 @@ namespace wavy::sph {
                 auto y = glm::floor((static_cast<float>(m_particles.size() - 1) - i) / grid_width) + .5f;
 
                 auto& prtcl = std::get<1>(enum_particle);
-                prtcl = particle{pos_offset + glm::vec2{x, y} * m_particle_radius};
+                prtcl = particle{pos_offset + glm::vec2{x, y} * m_config.get_particle_radius()};
                 prtcl.property = calc_property(prtcl.position);
             });
         }
@@ -94,7 +94,7 @@ namespace wavy::sph {
 
     void sph_solver::simulate_gravity_and_predict_positions(float delta_t)
     {
-        float delta_gravity = m_gravity * delta_t;
+        float delta_gravity = m_config.get_gravity() * delta_t;
         std::for_each(std::execution::par, std::begin(m_particles), std::end(m_particles),
                       [this, delta_gravity, delta_t](auto& particle) {
                           particle.velocity += glm::vec2{0.f, -1.f} * delta_gravity;
@@ -210,9 +210,10 @@ namespace wavy::sph {
                           }
                       });
     }
+
     glm::ivec2 sph_solver::grid_cell(const glm::vec2& p) const
     {
-        return glm::uvec2{glm::floor(p / m_particle_radius)};
+        return glm::uvec2{glm::floor(p / m_config.get_particle_radius())};
     }
 
     std::size_t sph_solver::grid_hash(const glm::ivec2& cell)

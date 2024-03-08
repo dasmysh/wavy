@@ -152,7 +152,7 @@ namespace wavy::sph {
     {
         assert(i < m_smoothing_kernels.size());
 
-        auto radius = glm::ceil(m_solver->get_particle_radius());
+        auto radius = glm::ceil(m_solver->get_config().get_particle_radius());
 
         sf::Sprite kernel_sprite;
         kernel_sprite.setTexture(m_smoothing_kernels[i]);
@@ -190,7 +190,8 @@ namespace wavy::sph {
     void sph::draw_grid(sf::RenderTarget& rt) const
     {
         constexpr float line_thickness = 3.f;
-        auto grid_size = simulation_to_render_area(glm::vec2{m_solver->get_particle_radius(), m_simulation_size.y - m_solver->get_particle_radius()});
+        auto grid_size = simulation_to_render_area(glm::vec2{m_solver->get_config().get_particle_radius(),
+                                                m_simulation_size.y - m_solver->get_config().get_particle_radius()});
         sf::Color line_color{150, 150, 150, 100};
 
         sf::RectangleShape line_horizontal{sf::Vector2f{m_render_size.x, line_thickness}};
@@ -204,7 +205,8 @@ namespace wavy::sph {
         line_vertical.setOutlineColor(line_color);
         line_vertical.setFillColor(line_color);
 
-        const auto line_start = render_area_to_screen(glm::abs(simulation_to_render_area(glm::vec2{m_solver->get_particle_radius()})));
+        const auto line_start = render_area_to_screen(
+            glm::abs(simulation_to_render_area(glm::vec2{m_solver->get_config().get_particle_radius()})));
         const auto line_end = render_area_to_screen(glm::vec2{m_render_size.x, 0.f});
 
         float y_line = line_start.y;
@@ -241,8 +243,9 @@ namespace wavy::sph {
             for (int ix = start_cell.x; ix <= end_cell.x; ++ix) {
                 auto cell_hash = sph_solver::grid_hash(glm::ivec2{ix, iy});
                 if (m_selected_cell_hash == cell_hash) {
-                    glm::vec2 simulation_position{static_cast<float>(ix) * m_solver->get_particle_radius(),
-                                                  static_cast<float>(iy) * m_solver->get_particle_radius()};
+                    glm::vec2 simulation_position{static_cast<float>(ix) * m_solver->get_config().get_particle_radius(),
+                                                  static_cast<float>(iy)
+                                                      * m_solver->get_config().get_particle_radius()};
                     auto screen_position = simulation_to_screen(simulation_position);
                     selected_cell_highlight.setPosition(screen_position.x, screen_position.y);
                     rt.draw(selected_cell_highlight);
@@ -255,7 +258,7 @@ namespace wavy::sph {
 
     void sph::update_smoothing_kernels()
     {
-        auto radius = static_cast<unsigned int>(glm::ceil(m_solver->get_particle_radius()));
+        auto radius = static_cast<unsigned int>(glm::ceil(m_solver->get_config().get_particle_radius()));
         for (std::size_t i = 0; i < m_smoothing_kernels.size(); ++i) { update_smoothing_kernel(i, radius); }
     }
 

@@ -8,6 +8,8 @@
 
 #pragma once
 
+import sph;
+
 #include <glm/vec2.hpp>
 
 namespace wavy::sph {
@@ -54,23 +56,9 @@ namespace wavy::sph {
         const std::vector<std::size_t>& get_cell_offsets() const { return m_cell_offsets; }
         const std::vector<std::size_t>& get_particle_indices() const { return m_particle_indices; }
 
-        float get_particle_radius() const { return m_particle_radius; }
-        void set_particle_radius(float radius) { m_particle_radius = radius; }
+        sph_config& get_config() { return m_config; }
+        const sph_config& get_config() const { return m_config; }
 
-        float get_particle_mass() const { return m_particle_mass; }
-        void set_particle_mass(float mass) { m_particle_mass = mass; }
-
-        float get_gravity() const { return m_gravity; }
-        void set_gravity(float gravity) { m_gravity = gravity; }
-
-        float get_collision_dampening() const { return m_collision_dampening; }
-        void set_collision_dampening(float collision_dampening) { m_collision_dampening = collision_dampening; }
-
-        float get_target_density() const { return m_target_density; }
-        void set_target_density(float target_density) { m_target_density = target_density; }
-
-        float get_pressure_multiplier() const { return m_pressure_multiplier; }
-        void set_pressure_multiplier(float pressure_multiplier) { m_pressure_multiplier = pressure_multiplier; }
 
         // public for visualization.
         float density_kernel(float r) const;
@@ -115,12 +103,7 @@ namespace wavy::sph {
         std::vector<std::atomic_int> m_particle_histogram;
         std::vector<std::size_t> m_cell_offsets;
         particle_pattern m_pattern;
-        float m_particle_radius = 20.f;
-        float m_particle_mass = 1.f;
-        float m_target_density = 2.75f;
-        float m_pressure_multiplier = .5f;
 
-        float m_gravity = 0.f;// 9.81f;
-        float m_collision_dampening = .1f;
+        sph_config m_config;
     };
 }
