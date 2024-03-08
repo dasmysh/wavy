@@ -80,9 +80,11 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
     spdlog::debug("Starting main loop.");
     wavy::sph::sph sph_manager{glm::vec2{ 1920.0f, 1080.0f }};
 
-    sf::Clock deltaClock;
+    sf::Clock delta_clock;
+    sf::Clock poll_clock;
     while (window.isOpen()) {
         // check all the window's events that were triggered since the last iteration of the loop
+        poll_clock.restart();
         sf::Event event;
         while (window.pollEvent(event)) {
             ImGui::SFML::ProcessEvent(window, event);
@@ -91,14 +93,16 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
             if (event.type == sf::Event::Closed) { window.close(); }
             if (event.type == sf::Event::Resized) {
                 // update the view to the new size of the window
-                sf::FloatRect visibleArea(0.f, 0.f, static_cast<float>(event.size.width), static_cast<float>(event.size.height));
+                sf::FloatRect visibleArea(0.f, 0.f, static_cast<float>(event.size.width),
+                                          static_cast<float>(event.size.height));
                 window.setView(sf::View(visibleArea));
             } else {
                 sph_manager.process_event(event);
             }
         }
+        auto delta_t = delta_clock.restart();
+        if (poll_clock.restart().asSeconds() > .5f) { continue; }
 
-        auto delta_t = deltaClock.restart();
         ImGui::SFML::Update(window, delta_t);
 
         sph_manager.simulation_frame(delta_t.asSeconds());
@@ -107,8 +111,10 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
 
         // clear the window with black color
         window.clear(sf::Color::Black);
+
         sph_manager.draw_simulation(window);
         sph_manager.draw_gui();
+
         ImGui::SFML::Render(window);
 
         // end the current frame
