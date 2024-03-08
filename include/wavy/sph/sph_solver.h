@@ -29,8 +29,13 @@ namespace wavy::sph {
 
         struct particle {
             particle() = default;
-            explicit particle(const glm::vec2& p) : position{p} {}
+            explicit particle(const glm::vec2& p)
+                : position{p}
+                , position_predicted{p}
+            {
+            }
             glm::vec2 position = glm::vec2{0.f};
+            glm::vec2 position_predicted = glm::vec2{0.f};
             glm::vec2 velocity = glm::vec2{0.f};
             float density = 0.f;
             float property = 0.f;
@@ -69,35 +74,38 @@ namespace wavy::sph {
 
         // public for visualization.
         float density_kernel(float r) const;
-        float property_kernel(float r) const;
-        float property_kernel_derivative(float r) const;
-        float calculate_density(const glm::vec2& p) const;
-        float calculate_property(const glm::vec2& p) const;
-        glm::vec2 calculate_property_gradient(const glm::vec2& p) const;
-        glm::vec2 calculate_pressure_force(const glm::vec2& p) const;
+        float pressure_kernel(float r) const;
+        float pressure_kernel_derivative(float r) const;
+        float calculate_density(const glm::vec2& center_position) const;
+        float calculate_property(const glm::vec2& center_position) const;
+        glm::vec2 calculate_property_gradient(const glm::vec2& center_position) const;
+        glm::vec2 calculate_pressure_force(const glm::vec2& center_position) const;
         glm::ivec2 grid_cell(const glm::vec2& p) const;
         static std::size_t grid_hash(const glm::ivec2& cell);
 
     private:
-        void simulate_gravity(float delta_t);
-        void resolve_collisions();
+        void simulate_gravity_and_predict_positions(float delta_t);
         void calculate_cell_offsets();
         void sort_particles_into_cells();
         void update_densities();
         void apply_pressure(float delta_t);
+        void update_positions_and_resolve_collisions(float delta_t);
 
         template<typename Ret, typename Pred>
-        Ret accumulate_over_neighbourhood(const glm::vec2& p, const Ret& start_value, Pred predicate) const;
+        Ret accumulate_over_neighbourhood(const glm::vec2& center_position, const Ret& start_value, Pred predicate) const;
         float calculate_property(std::size_t particle_index) const;
         glm::vec2 calculate_property_gradient(std::size_t particle_index) const;
         glm::vec2 calculate_pressure_force(std::size_t particle_index) const;
 
-        float calculate_density_internal(const glm::vec2& p, const particle& particle) const;
-        float calculate_property_internal(const glm::vec2& p, const particle& particle) const;
-        glm::vec2 calculate_property_gradient_internal(const glm::vec2& p, const particle& particle) const;
-        glm::vec2 calculate_pressure_force_internal(const glm::vec2& p, const particle& particle) const;
+        float calculate_density_internal(const glm::vec2& p, std::size_t particle_1_index) const;
+        float calculate_property_internal(const glm::vec2& p, std::size_t particle_1_index) const;
+        glm::vec2 calculate_property_gradient_internal(const glm::vec2& p, std::size_t particle_1_index) const;
+        glm::vec2 calculate_pressure_force_internal(std::size_t particle_0_index, std::size_t particle_1_index) const;
+        glm::vec2 calculate_pressure_force_internal(const glm::vec2& center_position,
+                                                    std::size_t particle_1_index) const;
 
         float density_to_pressure(float density) const;
+        float calculate_shared_pressure(float particle_0_density, float particle_1_density) const;
 
         static float calc_property(const glm::vec2& p);
 

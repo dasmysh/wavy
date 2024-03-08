@@ -268,7 +268,7 @@ namespace wavy::sph {
 
         float scale = 0.f;
         if (i == 0) { scale = .2f / m_solver->density_kernel(0.f); }
-        if (i == 1) { scale = .5f / m_solver->property_kernel(0.f); }
+        if (i == 1) { scale = .5f / m_solver->pressure_kernel(0.f); }
         for (unsigned int iy = 0; iy < radius; ++iy) {
             for (unsigned int ix = 0; ix < radius; ++ix) {
                 float value = 0.f;
@@ -278,7 +278,7 @@ namespace wavy::sph {
                 float r = glm::length(delta);
 
                 if (i == 0) { value = m_solver->density_kernel(r) * scale; }
-                if (i == 1) { value = m_solver->property_kernel(r) * scale; }
+                if (i == 1) { value = m_solver->pressure_kernel(r) * scale; }
 
                 auto v = static_cast<sf::Uint8>(value * 255.f);
                 auto c = sf::Color(255, 255, 255, v);
@@ -306,7 +306,7 @@ namespace wavy::sph {
 
         float scale = 0.f;
         if (i == 0) { scale = .2f / m_solver->density_kernel(0.f); }
-        if (i == 1) { scale = .5f / m_solver->property_kernel(0.f); }
+        if (i == 1) { scale = .5f / m_solver->pressure_kernel(0.f); }
 
 
         std::for_each(std::execution::par, std::begin(m_screen_ys), std::end(m_screen_ys),
@@ -660,4 +660,5 @@ namespace wavy::sph {
         return glm::vec2{1.f, -1.f} * (render_pos - glm::vec2{0.f, m_render_size.y})
                * (m_simulation_size / m_render_size);
     }
+
 }
