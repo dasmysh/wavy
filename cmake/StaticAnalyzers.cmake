@@ -1,5 +1,6 @@
 option(${NAMESPACE}_ENABLE_CPPCHECK "Enable static analysis with cppcheck" OFF)
 option(${NAMESPACE}_ENABLE_CLANG_TIDY "Enable static analysis with clang-tidy" OFF)
+option(${NAMESPACE}_ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" OFF)
 cmake_dependent_option(${NAMESPACE}_ENABLE_VS_STATICANALYSIS "Enable Visual Studio static analyzer" OFF "MSVC" OFF)
 if(${NAMESPACE}_ENABLE_CPPCHECK)
   find_program(${NAMESPACE}_CPPCHECK cppcheck)
@@ -36,5 +37,10 @@ function(set_project_static_analyzer project_name)
 
   if (MSVC AND ${NAMESPACE}_ENABLE_VS_STATICANALYSIS)
     set_target_properties(${project_name} PROPERTIES VS_GLOBAL_EnableMicrosoftCodeAnalysis true)
+  endif()
+
+  if (MSVC AND ${NAMESPACE}_ENABLE_ADDRESS_SANITIZER)
+    target_compile_options(${project_name} PRIVATE /Zi /fsanitize=address)
+    target_link_options(${project_name} PUBLIC /INCREMENTAL:NO)
   endif()
 endfunction()

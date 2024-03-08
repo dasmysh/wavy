@@ -15,19 +15,42 @@
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "VCPKG_MANIFEST_DIR": "${sourceDir}",
-        "VCPKG_TARGET_TRIPLET": "x64-windows"
+        "VCPKG_TARGET_TRIPLET": "x64-windows",
+        "WAVY_ENABLE_ADDRESS_SANITIZER": false
       },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
       }
-    }
+    },
+    {
+        "name": "sanitizers",
+        "displayName": "Default Config with Sanitizers",
+        "description": "Default build using Visual Studio generator and Sanitizers",
+        "generator": "Visual Studio 17 2022",
+        "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "binaryDir": "${sourceDir}/build.san",
+        "cacheVariables": {
+          "VCPKG_MANIFEST_DIR": "${sourceDir}",
+          "VCPKG_TARGET_TRIPLET": "x64-windows-asan",
+          "WAVY_ENABLE_ADDRESS_SANITIZER": true
+        },
+        "condition": {
+          "type": "equals",
+          "lhs": "${hostSystemName}",
+          "rhs": "Windows"
+        }
+      }
   ],
   "buildPresets": [
     {
       "name": "default",
       "configurePreset": "default"
+    },
+    {
+        "name": "sanitizers",
+        "configurePreset": "sanitizers"
     }
   ]
 }

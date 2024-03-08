@@ -33,7 +33,7 @@ target_include_directories(${APPLICATION_NAME}_lib PUBLIC
     ${PROJECT_SOURCE_DIR}/include/${PROJECT_REL_PATH}
     ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(${APPLICATION_NAME}_lib PROPERTIES FOLDER "${APPLICATION_NAME}")
-# set_project_static_analyzer(${APPLICATION_NAME}_lib)
+set_project_static_analyzer(${APPLICATION_NAME}_lib)
 
 
 add_executable(${APPLICATION_NAME} ${TOP_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
@@ -44,4 +44,4 @@ target_include_directories(${APPLICATION_NAME} PUBLIC
 set_property(DIRECTORY ${PROJECT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${APPLICATION_NAME})
 set_target_properties(${APPLICATION_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_target_properties(${APPLICATION_NAME} PROPERTIES FOLDER "${APPLICATION_NAME}")
-# set_project_static_analyzer(${APPLICATION_NAME})
+set_project_static_analyzer(${APPLICATION_NAME})

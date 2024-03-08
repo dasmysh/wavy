@@ -6,7 +6,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
       RelWithDebInfo
       CACHE STRING "Choose the type of build." FORCE)
   # Set the possible values of build type for cmake-gui, ccmake
-  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo")
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRING "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
 endif()
 
 find_program(CCACHE ccache)
@@ -46,8 +46,12 @@ function(set_project_options project_name)
   endif()
 
   if (MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.14)
-    set(PROJECT_OPTIONS ${MSVC_VECTOR_OPTIMIZATIONS} /external:W0 /external:anglebrackets /analyze:external- $<$<CONFIG:Debug>:/ZI>)
-    set(LINKER_OPTIONS "/INCREMENTAL")
+    set(LINKER_OPTIONS "")
+    set(PROJECT_OPTIONS ${MSVC_VECTOR_OPTIMIZATIONS} /external:W0 /external:anglebrackets /analyze:external-)
+    if (MSVC AND !${NAMESPACE}_ENABLE_ADDRESS_SANITIZER)
+      set(LINKER_OPTIONS ${LINKER_OPTIONS} /INCREMENTAL)
+      set(PROJECT_OPTIONS ${PROJECT_OPTIONS} $<$<CONFIG:Debug>:/ZI>)
+    endif()
     set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "/external:I ")
   elseif(MSVC)
     set(PROJECT_OPTIONS ${MSVC_VECTOR_OPTIMIZATIONS})

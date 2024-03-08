@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.27.1)
 set(APPLICATION_NAME wavy)
 project(${APPLICATION_NAME} CXX)
 string(TOUPPER "wavy" NAMESPACE)
+include(CMakeDependentOption)
 
 include(cmake/StandardProjectSettings.cmake)
 
