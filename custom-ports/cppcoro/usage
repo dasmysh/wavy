@@ -1,0 +1,4 @@
+cppcoro provides CMake targets:
+
+find_package(cppcoro CONFIG REQUIRED)
+target_link_libraries(main PRIVATE cppcoro::cppcoro)

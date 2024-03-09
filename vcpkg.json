@@ -8,7 +8,7 @@
     "fmt",
     "spdlog",
     "cereal",
-    "andreasbuhr-cppcoro",
+    "cppcoro",
     "eigen3",
     "glm",
     "sfml",
