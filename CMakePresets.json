@@ -7,7 +7,7 @@
   },
   "configurePresets": [
     {
-      "name": "default",
+      "name": "vs19",
       "displayName": "Default Config",
       "description": "Default build using Visual Studio generator",
       "generator": "Visual Studio 17 2022",
@@ -25,7 +25,7 @@
       }
     },
     {
-        "name": "sanitizers",
+        "name": "sanitizers-vs19",
         "displayName": "Default Config with Sanitizers",
         "description": "Default build using Visual Studio generator and Sanitizers",
         "generator": "Visual Studio 17 2022",
@@ -41,16 +41,85 @@
           "lhs": "${hostSystemName}",
           "rhs": "Windows"
         }
-      }
+    },
+    {
+        "name": "ninja-multi",
+        "displayName": "Ninja Multi-Config",
+        "description": "Default build using Ninja Multi-Config",
+        "generator": "Ninja Multi-Config",
+        "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "binaryDir": "${sourceDir}/build.ninja/${presetName}",
+        "cacheVariables": {
+          "VCPKG_MANIFEST_DIR": "${sourceDir}",
+          "VCPKG_TARGET_TRIPLET": "x64-windows"
+        }
+    },
+    {
+        "name": "sanitizers-ninja-multi",
+        "displayName": "Default Config with Sanitizers",
+        "description": "Default build using Ninja Multi-Config generator and Sanitizers",
+        "generator": "Ninja Multi-Config",
+        "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "binaryDir": "${sourceDir}/build.ninja.san/${presetName}",
+        "cacheVariables": {
+          "VCPKG_MANIFEST_DIR": "${sourceDir}",
+          "VCPKG_TARGET_TRIPLET": "x64-windows-asan",
+          "WAVY_ENABLE_ADDRESS_SANITIZER": true
+        }
+    }
   ],
   "buildPresets": [
     {
       "name": "default",
-      "configurePreset": "default"
+      "configurePreset": "vs19"
     },
     {
-        "name": "sanitizers",
-        "configurePreset": "sanitizers"
+      "name": "vs19",
+      "configurePreset": "vs19"
+    },
+    {
+        "name": "sanitizers-vs19",
+        "configurePreset": "sanitizers-vs19"
+    },
+    {
+        "name": "ninja-multi-debug",
+        "configurePreset": "ninja-multi",
+        "configuration": "Debug"
+    },
+    {
+        "name": "ninja-multi-relwithdebinfo",
+        "configurePreset": "ninja-multi",
+        "configuration": "RelWithDebInfo"
+    },
+    {
+        "name": "ninja-multi-minsizerel",
+        "configurePreset": "ninja-multi",
+        "configuration": "MinSizeRel"
+    },
+    {
+        "name": "ninja-multi-release",
+        "configurePreset": "ninja-multi",
+        "configuration": "Release"
+    },
+    {
+        "name": "ninja-multi-sanitizers-debug",
+        "configurePreset": "sanitizers-ninja-multi",
+        "configuration": "Debug"
+    },
+    {
+        "name": "ninja-multi-sanitizers-relwithdebinfo",
+        "configurePreset": "sanitizers-ninja-multi",
+        "configuration": "RelWithDebInfo"
+    },
+    {
+        "name": "ninja-multi-sanitizers-minsizerel",
+        "configurePreset": "sanitizers-ninja-multi",
+        "configuration": "MinSizeRel"
+    },
+    {
+        "name": "ninja-multi-sanitizers-release",
+        "configurePreset": "sanitizers-ninja-multi",
+        "configuration": "Release"
     }
   ]
 }
