@@ -8,7 +8,7 @@
 
 module;
 
-export module sph;// : config;
+export module sph;
 
 namespace wavy::sph
 {

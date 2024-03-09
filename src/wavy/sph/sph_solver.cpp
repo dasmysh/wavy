@@ -10,9 +10,7 @@
 #include "sph/sph_solver.h"
 #include "utils/enumerate.h"
 #include <glm/common.hpp>
-#include <glm/exponential.hpp>
 #include <glm/geometric.hpp>
-#include <glm/trigonometric.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/random.hpp>
 #include <algorithm>
