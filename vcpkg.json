@@ -9,6 +9,7 @@
     "spdlog",
     "cereal",
     "cppcoro",
+    {"name": "angelscript", "features": ["addons"]},
     "eigen3",
     "glm",
     "sfml",

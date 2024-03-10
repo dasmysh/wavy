@@ -1,6 +1,6 @@
 /**
  * @file   main.cpp
- * @author Sebastian Maisch <Sebastian Maisch_EMAIL>
+ * @author Sebastian Maisch <sebastian.maisch@googlemail.com>
  * @date   2023.10.06
  *
  * @brief  Implements the applications entry point for windows.
@@ -11,6 +11,7 @@
 #include "core/spdlog/sinks/filesink.h"
 #include "sph/sph.h"
 
+#include <angelscipt_helper.h>
 #include <SFML/Graphics.hpp>
 #include <imgui-SFML.h>
 #include <imgui.h>
@@ -24,6 +25,16 @@
 
 int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-escape)
 {
+    constexpr std::string_view config_file = "config.as";
+    constexpr std::string_view user_config_file = "config.user.as";
+
+    auto as_helper = std::make_unique<wavy::utils::angelscript_helper>();
+    as_helper->setup_types([&conf](auto as_eng) {
+    });
+
+    as_helper->execute_as_script_file(config_file, "cfg_module");
+    as_helper->execute_as_script_file(user_config_file, "user_cfg_module");
+
     try {
         constexpr std::string_view directory; // = "";
         constexpr std::string_view name = wavy::logFileName;

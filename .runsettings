@@ -4,6 +4,7 @@
     <!-- Adapter Specific sections -->
     <Catch2Adapter>
         <FilenameFilter>.*</FilenameFilter><!-- Regex filter -->
+        <WorkingDirectoryRoot>Solution</WorkingDirectoryRoot>
     </Catch2Adapter>
 
 </RunSettings>

@@ -11,6 +11,7 @@ target_link_libraries(${APPLICATION_NAME}_tests PRIVATE ${APPLICATION_NAME}_warn
 target_include_directories(${APPLICATION_NAME}_tests PRIVATE
     ${PROJECT_SOURCE_DIR}/include/${PROJECT_REL_PATH}
     ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(${APPLICATION_NAME}_tests PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_target_properties(${APPLICATION_NAME}_tests PROPERTIES FOLDER "tests")
 set_project_static_analyzer(${APPLICATION_NAME}_tests)
 

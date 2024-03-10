@@ -2,7 +2,7 @@ file(GLOB TOP_FILES CONFIGURE_DEPENDS
     ${PROJECT_SOURCE_DIR}/.runsettings)
 source_group(" " FILES ${TOP_FILES})
 add_library(catch_main STATIC catch_main.cpp ${TOP_FILES})
-target_link_libraries(catch_main PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings Catch2::Catch2 Catch2::Catch2WithMain fmt::fmt spdlog::spdlog)
+target_link_libraries(catch_main PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings Catch2::Catch2 Catch2::Catch2WithMain angelscript_helper)
 target_compile_definitions(catch_main PUBLIC CATCH_AMALGAMATED_CUSTOM_MAIN)
 set_target_properties(catch_main PROPERTIES FOLDER "tests")
 
@@ -13,6 +13,7 @@ include(Catch)
 add_executable(constexpr_tests constexpr_tests.cpp ${TOP_FILES})
 target_link_libraries(constexpr_tests ${APPLICATION_NAME}_warnings ${APPLICATION_NAME}_options catch_main)
 set_target_properties(constexpr_tests PROPERTIES FOLDER "tests")
+set_target_properties(constexpr_tests PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_project_static_analyzer(constexpr_tests)
 
 # automatically discover tests that are defined in catch based test files you
@@ -34,6 +35,7 @@ add_executable(relaxed_constexpr_tests constexpr_tests.cpp ${TOP_FILES})
 target_link_libraries(relaxed_constexpr_tests PRIVATE ${APPLICATION_NAME}_warnings ${APPLICATION_NAME}_options catch_main)
 target_compile_definitions(relaxed_constexpr_tests PRIVATE -DCATCH_CONFIG_RUNTIME_STATIC_REQUIRE)
 set_target_properties(relaxed_constexpr_tests PROPERTIES FOLDER "tests")
+set_target_properties(relaxed_constexpr_tests PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 set_project_static_analyzer(relaxed_constexpr_tests)
 
 catch_discover_tests(
