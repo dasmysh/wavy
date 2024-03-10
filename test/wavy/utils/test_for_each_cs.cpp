@@ -10,8 +10,9 @@
 #include <cppcoro/task.hpp>
 #include <spdlog/spdlog.h>
 
-namespace wavy::utils {
-    TEST_CASE("wavy::utils::for_each_cs", "")
+namespace wavy::utils
+{
+    TEST_CASE("wavy::utils::for_each_cs.for_each_cs", "")
     {
         spdlog::info("Starting parallel tasks with {} threads", std::thread::hardware_concurrency());
     }
