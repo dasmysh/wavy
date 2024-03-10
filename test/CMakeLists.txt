@@ -2,7 +2,8 @@ file(GLOB TOP_FILES CONFIGURE_DEPENDS
     ${PROJECT_SOURCE_DIR}/.runsettings)
 source_group(" " FILES ${TOP_FILES})
 add_library(catch_main STATIC catch_main.cpp ${TOP_FILES})
-target_link_libraries(catch_main PUBLIC Catch2::Catch2 Catch2::Catch2WithMain)
+target_link_libraries(catch_main PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings Catch2::Catch2 Catch2::Catch2WithMain fmt::fmt spdlog::spdlog)
+target_compile_definitions(catch_main PUBLIC CATCH_AMALGAMATED_CUSTOM_MAIN)
 set_target_properties(catch_main PROPERTIES FOLDER "tests")
 
 include(CTest)
