@@ -23,43 +23,98 @@
 #include <iostream>
 
 
+namespace wavy::test::utils {
+    namespace fs = std::filesystem;
+
+    class config
+    {
+    public:
+        const fs::path& get_log_directory() const { return m_log_directory; }
+        void set_log_directory(const fs::path& log_directory) { m_log_directory = log_directory; }
+        void set_log_directory(const std::string& log_directory) { m_log_directory = log_directory; }
+        const fs::path& get_log_filename() const { return m_log_filename; }
+        void set_log_filename(const fs::path& log_filename) { m_log_filename = log_filename; }
+        void set_log_filename(const std::string& log_filename) { m_log_filename = log_filename; }
+        const std::string& get_log_tag() const { return m_log_tag; }
+        void set_log_tag(const std::string& log_tag) { m_log_tag = log_tag; }
+
+        unsigned int get_window_width() const { return m_window_width; }
+        void set_window_width(unsigned int window_width) { m_window_width = window_width; }
+        unsigned int get_window_height() const { return m_window_height; }
+        void set_window_height(unsigned int window_height) { m_window_height = window_height; }
+
+        static void register_with_angelscript(asIScriptEngine* as_engine)
+        {
+            CHECK_AS_CALL(as_engine->RegisterObjectType("config", 0, asOBJ_REF | asOBJ_NOHANDLE));
+            CHECK_AS_CALL(as_engine->RegisterObjectMethod(
+                "config", "void set_log_directory(const string &in)",
+                asMETHODPR(config, set_log_directory, (const std::string&), void), asCALL_THISCALL));
+            CHECK_AS_CALL(as_engine->RegisterObjectMethod(
+                "config", "void set_log_filename(const string &in)",
+                asMETHODPR(config, set_log_filename, (const std::string&), void), asCALL_THISCALL));
+            CHECK_AS_CALL(as_engine->RegisterObjectMethod("config", "void set_log_tag(const string &in)",
+                                                          asMETHODPR(config, set_log_tag, (const std::string&), void),
+                                                          asCALL_THISCALL));
+            CHECK_AS_CALL(as_engine->RegisterObjectMethod("config", "void get_window_width(unsigned int)",
+                                                          asMETHODPR(config, get_window_width, (unsigned int), void),
+                                                          asCALL_THISCALL));
+            CHECK_AS_CALL(as_engine->RegisterObjectMethod("config", "void set_window_height(unsigned int)",
+                                                          asMETHODPR(config, set_window_height, (unsigned int), void),
+                                                          asCALL_THISCALL));
+        }
+
+    private:
+        fs::path m_log_directory;
+        fs::path m_log_filename = "tests.log";
+        std::string m_log_tag = "test";
+        unsigned int m_window_width = 1920;
+        unsigned int m_window_height = 1080;
+    };
+}
+
 int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-escape)
 {
+    wavy::test::utils::config conf;
     constexpr std::string_view config_file = "config.as";
     constexpr std::string_view user_config_file = "config.user.as";
 
     auto as_helper = std::make_unique<wavy::utils::angelscript_helper>();
     as_helper->setup_types([&conf](auto as_eng) {
+        wavy::test::utils::config::register_with_angelscript(as_eng);
+        CHECK_AS_CALL(as_eng->RegisterGlobalProperty("config cfg", &conf));
     });
 
     as_helper->execute_as_script_file(config_file, "cfg_module");
     as_helper->execute_as_script_file(user_config_file, "user_cfg_module");
 
     try {
-        constexpr std::string_view directory; // = "";
-        constexpr std::string_view name = wavy::logFileName;
-
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         console_sink->set_level(spdlog::level::warn);
-        console_sink->set_pattern(fmt::format("[{}] [%^%l%$] %v", wavy::logTag));
+        console_sink->set_pattern(fmt::format("[{}] [%^%l%$] %v", conf.get_log_tag()));
 
         auto devenv_sink = std::make_shared<spdlog::sinks::msvc_sink_mt>();
         devenv_sink->set_level(spdlog::level::err);
-        devenv_sink->set_pattern(fmt::format("[{}] [%^%l%$] %v", wavy::logTag));
+        devenv_sink->set_pattern(fmt::format("[{}] [%^%l%$] %v", conf.get_log_tag()));
 
         std::shared_ptr<spdlog::sinks::base_sink<std::mutex>> file_sink;
         if constexpr (wavy::debug_build) {
             file_sink = std::make_shared<mysh::core::spdlog::sinks::rotating_open_file_sink_mt>(
-                directory.empty() ? std::string{name} : std::string{directory}.append("/").append(name), 5);
+                (conf.get_log_directory().empty() ? conf.get_log_filename()
+                                                  : conf.get_log_directory() / conf.get_log_filename())
+                    .string(),
+                false);
             file_sink->set_level(spdlog::level::trace);
         } else {
             file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
-                directory.empty() ? std::string{name} : std::string{directory}.append("/").append(name), 5);
+                (conf.get_log_directory().empty() ? conf.get_log_filename()
+                                                  : conf.get_log_directory() / conf.get_log_filename())
+                    .string(),
+                false);
             file_sink->set_level(spdlog::level::trace);
         }
 
         const spdlog::sinks_init_list sink_list = {file_sink, console_sink, devenv_sink};
-        auto logger = std::make_shared<spdlog::logger>(wavy::logTag.data(), sink_list.begin(), sink_list.end());
+        auto logger = std::make_shared<spdlog::logger>(conf.get_log_tag(), sink_list.begin(), sink_list.end());
 
         spdlog::set_default_logger(logger);
         spdlog::flush_on(spdlog::level::err);
@@ -77,14 +132,12 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
         return 0;
     }
 
-    constexpr unsigned int window_width = 1920;
-    constexpr unsigned int window_height = 1080;
-
     spdlog::info("Creating SFML window.");
 
     sf::ContextSettings settings;
     settings.antialiasingLevel = 8;
-    sf::RenderWindow window(sf::VideoMode(window_width, window_height), "wavy", sf::Style::Default, settings);
+    sf::RenderWindow window(sf::VideoMode(conf.get_window_width(), conf.get_window_height()), "wavy",
+                            sf::Style::Default, settings);
     window.setFramerateLimit(60);
     ImGui::SFML::Init(window);
 
