@@ -79,17 +79,18 @@ int main(int argc, char* argv[])
         try {
             auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
             console_sink->set_level(spdlog::level::warn);
-            console_sink->set_pattern(fmt::format("[{}] [%^%l%$] %v", conf.get_log_tag()));
+            console_sink->set_pattern(fmt::format("[{}] [%^%l%$] [%t] %v", conf.get_log_tag()));
 
             auto devenv_sink = std::make_shared<spdlog::sinks::msvc_sink_mt>();
             devenv_sink->set_level(spdlog::level::err);
-            devenv_sink->set_pattern(fmt::format("[{}] [%^%l%$] %v", conf.get_log_tag()));
+            devenv_sink->set_pattern(fmt::format("[{}] [%^%l%$] [%t] %v", conf.get_log_tag()));
 
             auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
                 (conf.get_log_directory().empty() ? conf.get_log_filename()
                                                  : conf.get_log_directory() / conf.get_log_filename()).string(),
                 true);
             file_sink->set_level(spdlog::level::trace);
+            file_sink->set_pattern(fmt::format("[%T %f] [{}] [%^%l%$] [%t] %v", conf.get_log_tag()));
 
             const spdlog::sinks_init_list sink_list = {file_sink, console_sink, devenv_sink};
             auto logger = std::make_shared<spdlog::logger>(conf.get_log_tag(), sink_list.begin(), sink_list.end());
