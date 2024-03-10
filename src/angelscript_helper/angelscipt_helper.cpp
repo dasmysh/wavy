@@ -62,5 +62,7 @@ namespace wavy::utils {
         auto ctx = m_as_engine->CreateContext();
         ctx->Prepare(func);
         CHECK_AS_CTX_CALL(ctx->Execute(), ctx);
+
+        func->Release();
     }
 }

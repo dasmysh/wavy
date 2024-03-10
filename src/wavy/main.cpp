@@ -102,14 +102,14 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
                 (conf.get_log_directory().empty() ? conf.get_log_filename()
                                                   : conf.get_log_directory() / conf.get_log_filename())
                     .string(),
-                false);
+                true);
             file_sink->set_level(spdlog::level::trace);
         } else {
             file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
                 (conf.get_log_directory().empty() ? conf.get_log_filename()
                                                   : conf.get_log_directory() / conf.get_log_filename())
                     .string(),
-                false);
+                true);
             file_sink->set_level(spdlog::level::trace);
         }
 

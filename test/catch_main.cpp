@@ -88,7 +88,7 @@ int main(int argc, char* argv[])
             auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
                 (conf.get_log_directory().empty() ? conf.get_log_filename()
                                                  : conf.get_log_directory() / conf.get_log_filename()).string(),
-                false);
+                true);
             file_sink->set_level(spdlog::level::trace);
 
             const spdlog::sinks_init_list sink_list = {file_sink, console_sink, devenv_sink};
