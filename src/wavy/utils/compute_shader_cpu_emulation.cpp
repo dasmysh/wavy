@@ -17,7 +17,7 @@ namespace wavy::utils {
         co_await kernel;
     }
 
-    cppcoro::task<> wait_for_emulated_cs_tasks(std::vector<cppcoro::task<>> awaitables)
+    cppcoro::task<> wait_for_emulated_cs_tasks(std::vector<cppcoro::task<>>&& awaitables)
     {
         co_await cppcoro::when_all(std::move(awaitables));
     }

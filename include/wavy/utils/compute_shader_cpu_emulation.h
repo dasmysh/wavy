@@ -10,6 +10,7 @@
 
 #include "utils/async_barrier_on_threadpool.h"
 
+#include <cppcoro/sync_wait.hpp>
 #include <glm/vec3.hpp>
 #pragma warning(push)
 #pragma warning(disable : 5246)
@@ -32,7 +33,7 @@ namespace wavy::utils {
     };
 
     cppcoro::task<> run_emulated_cs_kernel_on_thread_pool(cppcoro::static_thread_pool& tp, cppcoro::task<> kernel);
-    cppcoro::task<> wait_for_emulated_cs_tasks(std::vector<cppcoro::task<>> awaitables);
+    cppcoro::task<> wait_for_emulated_cs_tasks(std::vector<cppcoro::task<>>&& awaitables);
 
     template<typename Pred>
     void schedule_emulated_compute_shader_work_group(cppcoro::static_thread_pool& tp, task_span_type awaitables,
@@ -97,6 +98,6 @@ namespace wavy::utils {
             }
         }
 
-        cppcoro::sync_wait(wait_for_emulated_cs_tasks(awaitables));
+        cppcoro::sync_wait(wait_for_emulated_cs_tasks(std::move(awaitables_linear)));
     }
 }

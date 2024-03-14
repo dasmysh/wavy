@@ -22,7 +22,6 @@
 #include <spdlog/spdlog.h>
 #include <iostream>
 
-
 namespace wavy::test::utils {
     namespace fs = std::filesystem;
 
@@ -55,8 +54,8 @@ namespace wavy::test::utils {
             CHECK_AS_CALL(as_engine->RegisterObjectMethod("config", "void set_log_tag(const string &in)",
                                                           asMETHODPR(config, set_log_tag, (const std::string&), void),
                                                           asCALL_THISCALL));
-            CHECK_AS_CALL(as_engine->RegisterObjectMethod("config", "void get_window_width(unsigned int)",
-                                                          asMETHODPR(config, get_window_width, (unsigned int), void),
+            CHECK_AS_CALL(as_engine->RegisterObjectMethod("config", "void set_window_width(unsigned int)",
+                                                          asMETHODPR(config, set_window_width, (unsigned int), void),
                                                           asCALL_THISCALL));
             CHECK_AS_CALL(as_engine->RegisterObjectMethod("config", "void set_window_height(unsigned int)",
                                                           asMETHODPR(config, set_window_height, (unsigned int), void),
