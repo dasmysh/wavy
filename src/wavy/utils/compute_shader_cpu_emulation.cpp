@@ -7,7 +7,6 @@
  */
 
 #include "utils/compute_shader_cpu_emulation.h"
-#include <cppcoro/when_all.hpp>
 
 namespace wavy::utils {
 

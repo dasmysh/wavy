@@ -11,6 +11,9 @@
 #include "utils/async_barrier_on_threadpool.h"
 
 #include <cppcoro/sync_wait.hpp>
+#include <cppcoro/when_all.hpp>
+#include <cppcoro/static_thread_pool.hpp>
+#include <cppcoro/task.hpp>
 #include <glm/vec3.hpp>
 #pragma warning(push)
 #pragma warning(disable : 5246)
@@ -36,9 +39,22 @@ namespace wavy::utils {
     cppcoro::task<> wait_for_emulated_cs_tasks(std::vector<cppcoro::task<>>&& awaitables);
 
     template<typename Pred>
-    void schedule_emulated_compute_shader_work_group(cppcoro::static_thread_pool& tp, task_span_type awaitables,
-                                                     const work_group_info& winfo, Pred kernel)
+    cppcoro::task<> schedule_emulated_compute_shader_work_group(cppcoro::static_thread_pool& tp, work_group_info winfo,
+                                                                Pred kernel)
     {
+        co_await tp.schedule();
+
+        auto thread_pool = std::make_shared<cppcoro::static_thread_pool>();
+
+        std::size_t work_group_size_linear =
+            winfo.work_group_size.x * winfo.work_group_size.y * winfo.work_group_size.z;
+        std::vector<cppcoro::task<>> awaitables_linear(work_group_size_linear);
+        task_span_type awaitables(awaitables_linear.data(), winfo.work_group_size.x, winfo.work_group_size.y,
+                                  winfo.work_group_size.z);
+
+        async_barrier_on_threadpool& barrier = winfo.barrier;
+
+        // TODO:
         for (std::size_t liz = 0; liz < winfo.work_group_size.z; ++liz) {
             for (std::size_t liy = 0; liy < winfo.work_group_size.y; ++liy) {
                 for (std::size_t lix = 0; lix < winfo.work_group_size.x; ++lix) {
@@ -48,14 +64,16 @@ namespace wavy::utils {
                         local_invocation_id.z * winfo.work_group_size.x * winfo.work_group_size.y
                         + local_invocation_id.y * winfo.work_group_size.x + local_invocation_id.x;
 
-                    auto& awaitable = awaitables[std::array<std::size_t, 3>{
-                        {global_invocation_id.x, global_invocation_id.y, global_invocation_id.z}}];
+                    auto& awaitable = awaitables[std::array<std::size_t, 3>{{lix, liy, liz}}];
 
                     awaitable = run_emulated_cs_kernel_on_thread_pool(
-                        tp, kernel(winfo, local_invocation_id, global_invocation_id, local_invocation_index));
+                        *thread_pool, kernel(winfo, local_invocation_id, global_invocation_id, local_invocation_index));
                 }
             }
         }
+
+        co_await barrier;
+         //.scheduling;
     }
 
     template<typename Pred>
@@ -69,13 +87,12 @@ namespace wavy::utils {
 
         std::vector<async_barrier_on_threadpool> barriers_linear(work_groups_linear);
         std::vector<std::uint8_t> shared_memory_linear(work_groups_linear * shared_memory_size);
-        std::vector<cppcoro::task<>> awaitables_linear(work_groups_linear * work_group_size_linear);
+        std::vector<cppcoro::task<>> awaitables_linear(work_groups_linear);
 
         barrier_span_type barriers(barriers_linear.data(), work_groups.x, work_groups.y, work_groups.z);
         shared_memory_span_type shared_memory(shared_memory_linear.data(), shared_memory_size, work_groups.x,
                                               work_groups.y, work_groups.z);
-        task_span_type awaitables(awaitables_linear.data(), work_groups.x * work_group_size.x,
-                                  work_groups.y * work_group_size.y, work_groups.z * work_group_size.z);
+        task_span_type awaitables(awaitables_linear.data(), work_groups.x, work_groups.y, work_groups.z);
 
         for (std::size_t wiz = 0; wiz < work_groups.z; ++wiz) {
             for (std::size_t wiy = 0; wiy < work_groups.y; ++wiy) {
@@ -93,11 +110,13 @@ namespace wavy::utils {
                                                              {0, work_group_id.x, work_group_id.y, work_group_id.z}}],
                                                          shared_memory_size}};
 
-                    schedule_emulated_compute_shader_work_group(*thread_pool, awaitables, winfo, kernel);
+                    awaitables[std::array<std::size_t, 3>{{wix, wiy, wiz}}] =
+                        schedule_emulated_compute_shader_work_group(*thread_pool, winfo, kernel);
                 }
             }
         }
 
-        cppcoro::sync_wait(wait_for_emulated_cs_tasks(std::move(awaitables_linear)));
+        // cppcoro::sync_wait(wait_for_emulated_cs_tasks(std::move(awaitables_linear)));
+        cppcoro::sync_wait(cppcoro::when_all(std::move(awaitables_linear)));
     }
 }

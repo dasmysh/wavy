@@ -8,31 +8,49 @@
 
 #pragma once
 
-#include "utils/async_manual_reset_event_on_threadpool.h"
+#include <atomic>
+#include <coroutine>
 
 namespace wavy::utils {
 
     class async_barrier_on_threadpool
     {
     public:
-        async_barrier_on_threadpool() noexcept;
-        async_barrier_on_threadpool(std::shared_ptr<cppcoro::static_thread_pool> tp,
-                                    std::ptrdiff_t initial_count) noexcept;
+        async_barrier_on_threadpool() noexcept = default;
+        explicit async_barrier_on_threadpool(std::ptrdiff_t initial_count) noexcept;
         ~async_barrier_on_threadpool() = default;
 
-        void reset(std::shared_ptr<cppcoro::static_thread_pool> tp, std::ptrdiff_t initial_count) noexcept;
-        bool is_ready() const noexcept { return m_event.is_set(); }
+        void reset() noexcept;
+        void reset(std::ptrdiff_t initial_count) noexcept;
+        bool is_ready() const noexcept { return m_barrier_hit.load(); }
         void count_down(std::ptrdiff_t n = 1) noexcept;
+
         auto operator co_await() noexcept
         {
             count_down();
-            return m_event.operator co_await();
+            return std::suspend_always{};
         }
 
+        struct barrier_scheduling_awaiter
+        {
+            explicit barrier_scheduling_awaiter(async_barrier_on_threadpool& b)
+                : barrier{b}
+            {}
+
+            auto operator co_await() const noexcept { return *this; }
+
+            bool await_ready() const noexcept;
+            bool await_suspend(std::coroutine_handle<> awaiter) noexcept;
+            void await_resume() const noexcept {}
+
+            async_barrier_on_threadpool& barrier;
+        };
+
+        auto scheduling() noexcept { return barrier_scheduling_awaiter{*this}; }
+
     private:
-        std::atomic<std::ptrdiff_t> m_count;
-        async_manual_reset_event_on_threadpool m_event;
-        std::vector<cppcoro::task<>> m_resume_tasks;
-        std::mutex m_resume_tasks_mutex;
+        std::atomic<std::ptrdiff_t> m_count = 0;
+        std::atomic_bool m_barrier_hit = true;
+        std::ptrdiff_t m_initial_count = 0;
     };
 }
