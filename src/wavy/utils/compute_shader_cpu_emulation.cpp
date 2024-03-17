@@ -10,10 +10,14 @@
 
 namespace wavy::utils {
 
-    cppcoro::task<> run_emulated_cs_kernel_on_thread_pool(cppcoro::static_thread_pool& tp, cppcoro::task<> kernel)
+    cppcoro::task<> resume_emulated_cs_kernel_on_thread_pool(cppcoro::static_thread_pool& tp,
+                                                             std::shared_ptr<async_barrier> scheduling_finsied_barrier,
+                                                             const cppcoro::task<>& kernel)
     {
+        auto coroutine = kernel.when_ready().m_coroutine;
         co_await tp.schedule();
-        co_await kernel;
+        coroutine.resume();
+        scheduling_finsied_barrier->count_down();
     }
 
     cppcoro::task<> wait_for_emulated_cs_tasks(std::vector<cppcoro::task<>>&& awaitables)

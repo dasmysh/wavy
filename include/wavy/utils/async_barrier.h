@@ -21,7 +21,6 @@ namespace wavy::utils {
         ~async_barrier() = default;
 
         void reset() noexcept;
-        void reset(std::ptrdiff_t initial_count) noexcept;
         bool is_ready() const noexcept { return m_barrier_hit.load(); }
         void count_down(std::ptrdiff_t n = 1) noexcept;
 

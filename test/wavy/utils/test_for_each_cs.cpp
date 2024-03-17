@@ -17,25 +17,26 @@
 namespace wavy::utils
 {
     cppcoro::task<> resume_on_thread_pool(cppcoro::static_thread_pool& tp,
-                                          async_barrier& scheduling_finsied_barrier,
+                                          std::shared_ptr<async_barrier> scheduling_finsied_barrier,
                                           const cppcoro::task<>& kernel)
     {
         auto coroutine = kernel.when_ready().m_coroutine;
         co_await tp.schedule();
         coroutine.resume();
         spdlog::error("resumed kernel done.");
-        scheduling_finsied_barrier.count_down();
+        scheduling_finsied_barrier->count_down();
     }
 
     template<typename Pred>
-    cppcoro::task<> run_all_items(const std::shared_ptr<cppcoro::static_thread_pool>& tp, async_barrier& barrier,
+    cppcoro::task<> run_all_items(std::shared_ptr<cppcoro::static_thread_pool> tp,
+                                  std::shared_ptr<async_barrier> barrier,
                                   const std::vector<int>& items, Pred work)
     {
         spdlog::info("tasks ({}) created, starting...", items.size());
 
         std::vector<cppcoro::task<>> awaitables(items.size());
         std::vector<cppcoro::task<>> work_awaitables(items.size());
-        async_barrier scheduling_finished_barrier{static_cast<std::ptrdiff_t>(items.size())};
+        auto scheduling_finished_barrier = std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(items.size()));
 
         std::ranges::for_each(zip(items, awaitables, work_awaitables),
                               [&tp, &work, &scheduling_finished_barrier](auto item_awaitables) {
@@ -46,29 +47,26 @@ namespace wavy::utils
                                   awaitable = resume_on_thread_pool(*tp, scheduling_finished_barrier, work_awaitable);
                               });
 
-        std::size_t ready_counter = 0;
         std::size_t resume_counter = 0;
-        std::vector<bool> ready_states(items.size(), false);
-        while (ready_counter < items.size()) {
+        bool all_kernels_done = false;
+        while (!all_kernels_done) {
             for (const auto& awaitable : awaitables) { awaitable.when_ready().m_coroutine.resume(); }
 
-            while (!scheduling_finished_barrier.is_ready()) { co_await scheduling_finished_barrier.scheduling(); }
+            while (!scheduling_finished_barrier->is_ready()) { co_await scheduling_finished_barrier->scheduling(); }
 
-            barrier.reset();
-            scheduling_finished_barrier.reset();
+            barrier->reset();
+            scheduling_finished_barrier->reset();
 
-            std::ranges::for_each(zip(awaitables, work_awaitables, ready_states),
-                                  [&tp, &ready_counter, &scheduling_finished_barrier](auto awaitable_items) {
+            all_kernels_done = true;
+            std::ranges::for_each(zip(awaitables, work_awaitables),
+                                  [&tp, &all_kernels_done, &scheduling_finished_barrier](auto awaitable_items) {
                                       auto& awaitable = std::get<0>(awaitable_items);
                                       auto& work_awaitable = std::get<1>(awaitable_items);
-                                      auto& ready_state = std::get<2>(awaitable_items);
                                       auto ready = work_awaitable.is_ready();
                                       if (!ready) {
+                                          all_kernels_done = false;
                                           awaitable =
                                               resume_on_thread_pool(*tp, scheduling_finished_barrier, work_awaitable);
-                                      } else if (!ready_state) {
-                                          ready_counter += 1;
-                                          ready_state = true;
                                       }
                                   });
 
@@ -102,17 +100,17 @@ namespace wavy::utils
         std::vector<int> items(num_elements);
         std::ranges::iota(items, 0);
 
-        async_barrier barrier{num_elements};
+        auto barrier = std::make_shared<async_barrier>(num_elements);
 
-        auto work = [&barrier](int i) -> cppcoro::task<> {
+        auto work = [barrier](int i) -> cppcoro::task<> {
 
             spdlog::info("doing work: {} 1/3.", i);
 
-            co_await barrier;
+            co_await *barrier;
 
             spdlog::info("doing work: {} 2/3.", i);
 
-            co_await barrier;
+            co_await *barrier;
 
             spdlog::info("doing work: {} 3/3.", i);
             co_return;

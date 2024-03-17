@@ -18,13 +18,6 @@ namespace wavy::utils {
     {
     }
 
-    void async_barrier::reset(std::ptrdiff_t initial_count) noexcept
-    {
-        m_count.store(initial_count);
-        m_barrier_hit.store(initial_count <= 0);
-        m_initial_count = initial_count;
-    }
-
     void async_barrier::reset() noexcept
     {
         m_count.store(m_initial_count);
