@@ -35,19 +35,16 @@ namespace wavy::utils {
         std::span<std::uint8_t> shared_memory;
     };
 
-    cppcoro::task<> resume_emulated_cs_kernel_on_thread_pool(cppcoro::static_thread_pool& tp,
-                                                             std::shared_ptr<async_barrier> scheduling_finsied_barrier,
-                                                             const cppcoro::task<>& kernel);
+    cppcoro::task<> resume_on_thread_pool(cppcoro::static_thread_pool& tp,
+                                          std::shared_ptr<async_barrier> scheduling_finsied_barrier,
+                                          const cppcoro::task<>& kernel);
     cppcoro::task<> wait_for_emulated_cs_tasks(std::vector<cppcoro::task<>>&& awaitables);
 
     template<typename Pred>
     cppcoro::task<>
-    schedule_emulated_compute_shader_work_group(std::shared_ptr<cppcoro::static_thread_pool> work_groups_thread_pool,
-                                                std::shared_ptr<cppcoro::static_thread_pool> worker_thread_pool,
+    schedule_emulated_compute_shader_work_group(std::shared_ptr<cppcoro::static_thread_pool> worker_thread_pool,
                                                 work_group_info winfo, Pred kernel)
     {
-        co_await work_groups_thread_pool->schedule();
-
         std::size_t work_group_size_linear =
             winfo.work_group_size.x * winfo.work_group_size.y * winfo.work_group_size.z;
         std::vector<cppcoro::task<>> awaitables_linear(work_group_size_linear);
@@ -74,8 +71,8 @@ namespace wavy::utils {
                     auto& awaitable = awaitables[std::array<std::size_t, 3>{{lix, liy, liz}}];
                     auto& kernel_awaitable = kernel_awaitables[std::array<std::size_t, 3>{{lix, liy, liz}}];
                     kernel_awaitable = kernel(winfo, local_invocation_id, global_invocation_id, local_invocation_index);
-                    awaitable = resume_emulated_cs_kernel_on_thread_pool(*worker_thread_pool,
-                                                                         scheduling_finished_barrier, kernel_awaitable);
+                    awaitable =
+                        resume_on_thread_pool(*worker_thread_pool, scheduling_finished_barrier, kernel_awaitable);
                 }
             }
         }
@@ -84,10 +81,7 @@ namespace wavy::utils {
         while (!all_kernels_done) {
             for (const auto& awaitable : awaitables_linear) { awaitable.when_ready().m_coroutine.resume(); }
 
-            while (!scheduling_finished_barrier->is_ready()) {
-                co_await scheduling_finished_barrier->scheduling();
-                co_await work_groups_thread_pool->schedule();
-            }
+            while (!scheduling_finished_barrier->is_ready()) { co_await scheduling_finished_barrier->scheduling(); }
 
             barrier->reset();
             scheduling_finished_barrier->reset();
@@ -96,19 +90,19 @@ namespace wavy::utils {
             for (std::size_t i = 0; i < awaitables_linear.size(); ++i) {
                 auto& awaitable = awaitables_linear[i];
                 auto& kernel_awaitable = kernel_awaitables_linear[i];
-                auto ready = kernel_awaitable.is_ready();
-                if (!ready) {
+                if (!kernel_awaitable.is_ready()) {
                     all_kernels_done = false;
-                    awaitable = resume_emulated_cs_kernel_on_thread_pool(*worker_thread_pool,
-                                                                         scheduling_finished_barrier, kernel_awaitable);
+                    awaitable =
+                        resume_on_thread_pool(*worker_thread_pool, scheduling_finished_barrier, kernel_awaitable);
                 }
             }
         }
     }
 
     template<typename Pred>
-    void emulate_compute_shader(const glm::uvec3& work_groups, const glm::uvec3& work_group_size,
-                                std::size_t shared_memory_size, Pred kernel)
+    cppcoro::task<> emulate_compute_shader_schedule_work_groups(const glm::uvec3& work_groups,
+                                                                const glm::uvec3& work_group_size,
+                                                                std::size_t shared_memory_size, Pred kernel)
     {
         std::size_t work_groups_linear = work_groups.x * work_groups.y * work_groups.z;
         std::size_t work_group_size_linear = work_group_size.x * work_group_size.y * work_group_size.z;
@@ -117,15 +111,19 @@ namespace wavy::utils {
             std::make_shared<cppcoro::static_thread_pool>(static_cast<std::uint32_t>(work_groups_linear));
         auto worker_thread_pool = std::make_shared<cppcoro::static_thread_pool>();
 
-
         std::vector<std::shared_ptr<async_barrier>> barriers_linear(work_groups_linear);
         std::vector<std::uint8_t> shared_memory_linear(work_groups_linear * shared_memory_size);
         std::vector<cppcoro::task<>> awaitables_linear(work_groups_linear);
+        std::vector<cppcoro::task<>> work_group_awaitables_linear(work_groups_linear);
+
+        auto scheduling_finished_barrier =
+            std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(work_group_size_linear));
 
         barrier_span_type barriers(barriers_linear.data(), work_groups.x, work_groups.y, work_groups.z);
         shared_memory_span_type shared_memory(shared_memory_linear.data(), shared_memory_size, work_groups.x,
                                               work_groups.y, work_groups.z);
         task_span_type awaitables(awaitables_linear.data(), work_groups.x, work_groups.y, work_groups.z);
+        task_span_type work_group_awaitables(awaitables_linear.data(), work_groups.x, work_groups.y, work_groups.z);
 
         for (std::size_t wiz = 0; wiz < work_groups.z; ++wiz) {
             for (std::size_t wiy = 0; wiy < work_groups.y; ++wiy) {
@@ -143,14 +141,49 @@ namespace wavy::utils {
                                                              {0, work_group_id.x, work_group_id.y, work_group_id.z}}],
                                                          shared_memory_size}};
 
-                    awaitables[std::array<std::size_t, 3>{{wix, wiy, wiz}}] =
-                        schedule_emulated_compute_shader_work_group(work_groups_thread_pool, worker_thread_pool, winfo,
-                                                                    kernel);
+                    auto& awaitable = awaitables[std::array<std::size_t, 3>{{wix, wiy, wiz}}];
+                    auto& work_group_awaitable = work_group_awaitables[std::array<std::size_t, 3>{{wix, wiy, wiz}}];
+
+                    work_group_awaitable =
+                        schedule_emulated_compute_shader_work_group(worker_thread_pool, winfo, kernel);
+                    awaitable = resume_on_thread_pool(*work_groups_thread_pool, scheduling_finished_barrier,
+                                                      work_group_awaitable);
                 }
             }
         }
 
-        // cppcoro::sync_wait(wait_for_emulated_cs_tasks(std::move(awaitables_linear)));
-        cppcoro::sync_wait(cppcoro::when_all(std::move(awaitables_linear)));
+        bool all_work_groups_done = false;
+        while (!all_work_groups_done) {
+            for (const auto& awaitable : awaitables_linear) { awaitable.when_ready().m_coroutine.resume(); }
+
+            while (!scheduling_finished_barrier->is_ready()) { co_await scheduling_finished_barrier->scheduling(); }
+
+            scheduling_finished_barrier->reset();
+
+            all_work_groups_done = true;
+            for (std::size_t i = 0; i < awaitables_linear.size(); ++i) {
+                auto& awaitable = awaitables_linear[i];
+                auto& work_group_awaitable = work_group_awaitables_linear[i];
+                if (!work_group_awaitable.is_ready()) {
+                    all_work_groups_done = false;
+                    awaitable = resume_on_thread_pool(*work_groups_thread_pool, scheduling_finished_barrier,
+                                                      work_group_awaitable);
+                }
+            }
+        }
+    }
+
+    template<typename Pred>
+    void emulate_compute_shader(const glm::uvec3& work_groups, const glm::uvec3& work_group_size,
+                                std::size_t shared_memory_size, Pred kernel)
+    {
+        auto scheduler =
+            emulate_compute_shader_schedule_work_groups(work_groups, work_group_size, shared_memory_size, kernel);
+
+        bool done = false;
+        while (!done) {
+            scheduler.when_ready().m_coroutine.resume();
+            done = scheduler.when_ready().m_coroutine.done();
+        }
     }
 }
