@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "utils/async_barrier_on_threadpool.h"
+#include "utils/async_barrier.h"
 
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/when_all.hpp>
@@ -22,7 +22,7 @@
 
 namespace wavy::utils {
 
-    using barrier_span_type = std::mdspan<async_barrier_on_threadpool, std::dextents<std::size_t, 3>>;
+    using barrier_span_type = std::mdspan<async_barrier, std::dextents<std::size_t, 3>>;
     using shared_memory_span_type = std::mdspan<std::uint8_t, std::dextents<std::size_t, 4>>;
     using task_span_type = std::mdspan<cppcoro::task<>, std::dextents<std::size_t, 3>>;
 
@@ -31,7 +31,7 @@ namespace wavy::utils {
         glm::uvec3 num_work_groups;
         glm::uvec3 work_group_size;
         glm::uvec3 work_group_id;
-        async_barrier_on_threadpool& barrier;
+        async_barrier& barrier;
         std::span<std::uint8_t> shared_memory;
     };
 
@@ -52,7 +52,7 @@ namespace wavy::utils {
         task_span_type awaitables(awaitables_linear.data(), winfo.work_group_size.x, winfo.work_group_size.y,
                                   winfo.work_group_size.z);
 
-        async_barrier_on_threadpool& barrier = winfo.barrier;
+        async_barrier& barrier = winfo.barrier;
 
         // TODO:
         for (std::size_t liz = 0; liz < winfo.work_group_size.z; ++liz) {
@@ -85,7 +85,7 @@ namespace wavy::utils {
         std::size_t work_groups_linear = work_groups.x * work_groups.y * work_groups.z;
         std::size_t work_group_size_linear = work_group_size.x * work_group_size.y * work_group_size.z;
 
-        std::vector<async_barrier_on_threadpool> barriers_linear(work_groups_linear);
+        std::vector<async_barrier> barriers_linear(work_groups_linear);
         std::vector<std::uint8_t> shared_memory_linear(work_groups_linear * shared_memory_size);
         std::vector<cppcoro::task<>> awaitables_linear(work_groups_linear);
 

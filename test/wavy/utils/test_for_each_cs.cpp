@@ -30,9 +30,8 @@ namespace wavy::utils
     }
 
     template<typename Pred>
-    cppcoro::task<> run_all_items(const std::shared_ptr<cppcoro::static_thread_pool>& tp,
-        async_barrier_on_threadpool& barrier,
-        const std::vector<int>& items, Pred work)
+    cppcoro::task<> run_all_items(const std::shared_ptr<cppcoro::static_thread_pool>& tp, async_barrier& barrier,
+                                  const std::vector<int>& items, Pred work)
     {
         spdlog::info("tasks ({}) created, starting...", items.size());
 
@@ -116,7 +115,7 @@ namespace wavy::utils
         std::vector<int> items(num_elements);
         std::ranges::iota(items, 0);
 
-        async_barrier_on_threadpool barrier{num_elements};
+        async_barrier barrier{num_elements};
 
         auto work = [&barrier](int i) -> cppcoro::task<> {
 

@@ -1,5 +1,5 @@
 /**
- * @file   async_barrier_on_threadpool.h
+ * @file   async_barrier.h
  * @author Sebastian Maisch <sebastian.maisch@googlemail.com>
  * @date   2024.03.11
  *
@@ -13,12 +13,12 @@
 
 namespace wavy::utils {
 
-    class async_barrier_on_threadpool
+    class async_barrier
     {
     public:
-        async_barrier_on_threadpool() noexcept = default;
-        explicit async_barrier_on_threadpool(std::ptrdiff_t initial_count) noexcept;
-        ~async_barrier_on_threadpool() = default;
+        async_barrier() noexcept = default;
+        explicit async_barrier(std::ptrdiff_t initial_count) noexcept;
+        ~async_barrier() = default;
 
         void reset() noexcept;
         void reset(std::ptrdiff_t initial_count) noexcept;
@@ -33,17 +33,17 @@ namespace wavy::utils {
 
         struct barrier_scheduling_awaiter
         {
-            explicit barrier_scheduling_awaiter(async_barrier_on_threadpool& b)
+            explicit barrier_scheduling_awaiter(async_barrier& b)
                 : barrier{b}
             {}
 
             auto operator co_await() const noexcept { return *this; }
 
             bool await_ready() const noexcept;
-            bool await_suspend(std::coroutine_handle<> awaiter) noexcept;
+            bool await_suspend(std::coroutine_handle<> awaiter) const noexcept;
             void await_resume() const noexcept {}
 
-            async_barrier_on_threadpool& barrier;
+            async_barrier& barrier;
         };
 
         auto scheduling() noexcept { return barrier_scheduling_awaiter{*this}; }
