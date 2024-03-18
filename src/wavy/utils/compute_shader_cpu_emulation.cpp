@@ -19,10 +19,4 @@ namespace wavy::utils {
         coroutine.resume();
         scheduling_finsied_barrier->count_down();
     }
-
-    cppcoro::task<> wait_for_emulated_cs_tasks(std::vector<cppcoro::task<>>&& awaitables)
-    {
-        co_await cppcoro::when_all(std::move(awaitables));
-    }
-
 }

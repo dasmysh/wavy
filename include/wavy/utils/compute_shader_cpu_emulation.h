@@ -38,7 +38,6 @@ namespace wavy::utils {
     cppcoro::task<> resume_on_thread_pool(cppcoro::static_thread_pool& tp,
                                           std::shared_ptr<async_barrier> scheduling_finsied_barrier,
                                           const cppcoro::task<>& kernel);
-    cppcoro::task<> wait_for_emulated_cs_tasks(std::vector<cppcoro::task<>>&& awaitables);
 
     template<typename Pred>
     cppcoro::task<>
