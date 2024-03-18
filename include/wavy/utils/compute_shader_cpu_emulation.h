@@ -123,7 +123,8 @@ namespace wavy::utils {
         shared_memory_span_type shared_memory(shared_memory_linear.data(), shared_memory_size, work_groups.x,
                                               work_groups.y, work_groups.z);
         task_span_type awaitables(awaitables_linear.data(), work_groups.x, work_groups.y, work_groups.z);
-        task_span_type work_group_awaitables(awaitables_linear.data(), work_groups.x, work_groups.y, work_groups.z);
+        task_span_type work_group_awaitables(work_group_awaitables_linear.data(), work_groups.x, work_groups.y,
+                                             work_groups.z);
 
         for (std::size_t wiz = 0; wiz < work_groups.z; ++wiz) {
             for (std::size_t wiy = 0; wiy < work_groups.y; ++wiy) {
@@ -133,13 +134,15 @@ namespace wavy::utils {
                     auto& barrier =
                         barriers[std::array<std::size_t, 3>{{work_group_id.x, work_group_id.y, work_group_id.z}}];
                     barrier = std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(work_group_size_linear));
-                    work_group_info winfo{.num_work_groups = work_groups,
-                                          .work_group_size = work_group_size,
-                                          .work_group_id = work_group_id,
-                                          .barrier = barrier,
-                                          .shared_memory{&shared_memory[std::array<std::size_t, 4>{
-                                                             {0, work_group_id.x, work_group_id.y, work_group_id.z}}],
-                                                         shared_memory_size}};
+                    work_group_info winfo{
+                        .num_work_groups = work_groups,
+                        .work_group_size = work_group_size,
+                        .work_group_id = work_group_id,
+                        .barrier = barrier,
+                        .shared_memory{shared_memory_size > 0 ? &shared_memory[std::array<std::size_t, 4>{
+                                           {0, work_group_id.x, work_group_id.y, work_group_id.z}}]
+                                                              : nullptr,
+                                       shared_memory_size}};
 
                     auto& awaitable = awaitables[std::array<std::size_t, 3>{{wix, wiy, wiz}}];
                     auto& work_group_awaitable = work_group_awaitables[std::array<std::size_t, 3>{{wix, wiy, wiz}}];
