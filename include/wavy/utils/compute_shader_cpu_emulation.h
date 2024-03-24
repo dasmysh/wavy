@@ -113,7 +113,7 @@ namespace wavy::utils {
         std::vector<cppcoro::task<>> work_group_awaitables_linear(work_groups_linear);
 
         auto scheduling_finished_barrier =
-            std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(work_group_size_linear));
+            std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(work_groups_linear));
 
         barrier_span_type barriers(barriers_linear.data(), work_groups.x, work_groups.y, work_groups.z);
         shared_memory_span_type shared_memory(shared_memory_linear.data(), shared_memory_size, work_groups.x,
