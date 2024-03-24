@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
             auto logger = std::make_shared<spdlog::logger>(conf.get_log_tag(), sink_list.begin(), sink_list.end());
 
             spdlog::set_default_logger(logger);
-            spdlog::flush_on(spdlog::level::err);
+            spdlog::flush_on(spdlog::level::trace);
 
             spdlog::set_level(spdlog::level::trace);
 

@@ -157,6 +157,58 @@ namespace wavy::utils
         for (const auto& executed : thread_executed_linear) { CHECK(executed == 1); }
     }
 
+    TEST_CASE("wavy::utils::emulate_compute_shader.multiple threads in multiple workgroups 1D/1D", "")
+    {
+        std::vector<bool> thread_executed(100, false);
+        std::atomic_bool atomic_all_work_groups_indices_correct = true;
+        std::atomic_bool atomic_all_invocation_indices_correct_1d = true;
+        std::atomic_bool atomic_all_invocation_indices_correct = true;
+
+        auto kernel = [&thread_executed, &atomic_all_work_groups_indices_correct,
+                       &atomic_all_invocation_indices_correct_1d, &atomic_all_invocation_indices_correct](
+                          work_group_info winfo, glm::uvec3 local_invocation_id, glm::uvec3 global_invocation_id,
+                          unsigned local_invocation_index) -> cppcoro::task<> {
+            [[maybe_unused]] std::size_t current_work_group =
+                winfo.work_group_id.z * winfo.num_work_groups.y * winfo.num_work_groups.x
+                + winfo.work_group_id.y * winfo.num_work_groups.x + winfo.work_group_id.x;
+            bool expected = true;
+            atomic_all_work_groups_indices_correct.compare_exchange_strong(expected,
+                                                                           current_work_group
+                                                                               == winfo.work_group_id.x); // 1D!!
+
+            auto global_size = winfo.num_work_groups * winfo.work_group_size;
+            auto global_work_group_id = winfo.work_group_id * winfo.work_group_size;
+            std::size_t current_global_invocation_index = global_invocation_id.z * global_size.y * global_size.x
+                                                          + global_invocation_id.y * global_size.x
+                                                          + global_invocation_id.x;
+            [[maybe_unused]] std::size_t global_work_group_index =
+                global_work_group_id.z * global_size.y * global_size.x + global_work_group_id.y * global_size.x
+                + global_work_group_id.x;
+
+            expected = true;
+            atomic_all_invocation_indices_correct_1d.compare_exchange_strong(
+                expected, current_global_invocation_index == global_invocation_id.x); // 1D!!
+            expected = true;
+            atomic_all_invocation_indices_correct.compare_exchange_strong(
+                expected, current_global_invocation_index == global_work_group_index + local_invocation_index);
+            thread_executed[current_global_invocation_index] = true;
+            co_return;
+        };
+
+        emulate_compute_shader(glm::uvec3{10, 1, 1}, glm::uvec3{10, 1, 1}, 0, kernel);
+
+        bool all_work_groups_indices_correct = atomic_all_work_groups_indices_correct.load();
+        bool all_invocation_indices_correct_1d = atomic_all_invocation_indices_correct_1d.load();
+        bool all_invocation_indices_correct = atomic_all_invocation_indices_correct.load();
+        CHECK(all_work_groups_indices_correct == true);
+        CHECK(all_invocation_indices_correct_1d == true);
+        CHECK(all_invocation_indices_correct == true);
+
+        for (bool executed : thread_executed) { CHECK(executed == true); }
+    }
+            thread_executed[current_global_invocation_index] = true;
+            co_return;
+        };
     TEST_CASE("wavy::utils::emulate_compute_shader.playground", "")
     {
 
