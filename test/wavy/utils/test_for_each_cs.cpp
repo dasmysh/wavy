@@ -89,8 +89,77 @@ namespace wavy::utils
         co_return;
     }
 
-    TEST_CASE("wavy::utils::for_each_cs.for_each_cs", "")
+    TEST_CASE("wavy::utils::emulate_compute_shader.simple execution", "")
     {
+        bool single_thread_executed = false;
+        auto kernel = [&single_thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
+                                                glm::uvec3 global_invocation_id,
+                                                unsigned local_invocation_index) -> cppcoro::task<> {
+            single_thread_executed = true;
+            co_return;
+        };
+
+        emulate_compute_shader(glm::uvec3{1}, glm::uvec3{1}, 0, kernel);
+
+        CHECK(single_thread_executed == true);
+    }
+
+    TEST_CASE("wavy::utils::emulate_compute_shader.multiple threads in one workgroup 1D", "")
+    {
+        std::vector<bool> thread_executed(100, false);
+        auto kernel = [&thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
+                                                glm::uvec3 global_invocation_id,
+                                                unsigned local_invocation_index) -> cppcoro::task<> {
+            thread_executed[local_invocation_index] = true;
+            co_return;
+        };
+
+        emulate_compute_shader(glm::uvec3{1}, glm::uvec3{100, 1, 1}, 0, kernel);
+
+        for (bool executed : thread_executed) { CHECK(executed == true); }
+    }
+
+    TEST_CASE("wavy::utils::emulate_compute_shader.multiple threads in one workgroup 2D", "")
+    {
+        std::vector<std::uint8_t> thread_executed_linear(100,
+                                                         std::uint8_t(0)); // std::vector<bool> seems to have no .data()
+        std::mdspan<std::uint8_t, std::dextents<std::size_t, 2>> thread_executed(thread_executed_linear.data(), 10, 10);
+
+        auto kernel = [&thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
+                                         glm::uvec3 global_invocation_id,
+                                         unsigned local_invocation_index) -> cppcoro::task<> {
+            thread_executed[std::array<std::size_t, 2>{global_invocation_id.x, global_invocation_id.y}] = 1;
+            co_return;
+        };
+
+        emulate_compute_shader(glm::uvec3{1}, glm::uvec3{10, 10, 1}, 0, kernel);
+
+        for (const auto& executed : thread_executed_linear) { CHECK(executed == 1); }
+    }
+
+    TEST_CASE("wavy::utils::emulate_compute_shader.multiple threads in one workgroup 3D", "")
+    {
+        std::vector<std::uint8_t> thread_executed_linear(125,
+                                                         std::uint8_t(0)); // std::vector<bool> seems to have no .data()
+        std::mdspan<std::uint8_t, std::dextents<std::size_t, 3>> thread_executed(thread_executed_linear.data(), 5, 5,
+                                                                                 5);
+
+        auto kernel = [&thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
+                                         glm::uvec3 global_invocation_id,
+                                         unsigned local_invocation_index) -> cppcoro::task<> {
+            thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
+                                                       global_invocation_id.z}] = 1;
+            co_return;
+        };
+
+        emulate_compute_shader(glm::uvec3{1}, glm::uvec3{5, 5, 5}, 0, kernel);
+
+        for (const auto& executed : thread_executed_linear) { CHECK(executed == 1); }
+    }
+
+    TEST_CASE("wavy::utils::emulate_compute_shader.playground", "")
+    {
+
         spdlog::info("Starting parallel tasks with {} threads", std::thread::hardware_concurrency());
 
         auto tp = std::make_shared<cppcoro::static_thread_pool>(2);
