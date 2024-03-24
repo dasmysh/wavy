@@ -103,8 +103,7 @@ namespace wavy::utils {
         std::size_t work_groups_linear = work_groups.x * work_groups.y * work_groups.z;
         std::size_t work_group_size_linear = work_group_size.x * work_group_size.y * work_group_size.z;
 
-        auto work_groups_thread_pool =
-            std::make_shared<cppcoro::static_thread_pool>(static_cast<std::uint32_t>(work_groups_linear));
+        cppcoro::static_thread_pool work_groups_thread_pool(static_cast<std::uint32_t>(work_groups_linear));
         auto worker_thread_pool = std::make_shared<cppcoro::static_thread_pool>();
 
         std::vector<std::shared_ptr<async_barrier>> barriers_linear(work_groups_linear);
@@ -145,7 +144,7 @@ namespace wavy::utils {
 
                     work_group_awaitable =
                         schedule_emulated_compute_shader_work_group(worker_thread_pool, winfo, kernel);
-                    awaitable = resume_on_thread_pool(*work_groups_thread_pool, scheduling_finished_barrier,
+                    awaitable = resume_on_thread_pool(work_groups_thread_pool, scheduling_finished_barrier,
                                                       work_group_awaitable);
                 }
             }
@@ -153,22 +152,26 @@ namespace wavy::utils {
 
         bool all_work_groups_done = false;
         while (!all_work_groups_done) {
-            for (const auto& awaitable : awaitables_linear) { awaitable.when_ready().m_coroutine.resume(); }
+            for (const auto& awaitable : awaitables_linear) {
+                if (!awaitable.is_ready()) { awaitable.when_ready().m_coroutine.resume(); }
+            }
 
             while (!scheduling_finished_barrier->is_ready()) { co_await scheduling_finished_barrier->scheduling(); }
 
-            scheduling_finished_barrier->reset();
-
             all_work_groups_done = true;
+            std::ptrdiff_t unfinished_work_groups = 0;
             for (std::size_t i = 0; i < awaitables_linear.size(); ++i) {
                 auto& awaitable = awaitables_linear[i];
                 auto& work_group_awaitable = work_group_awaitables_linear[i];
                 if (!work_group_awaitable.is_ready()) {
                     all_work_groups_done = false;
-                    awaitable = resume_on_thread_pool(*work_groups_thread_pool, scheduling_finished_barrier,
+                    awaitable = resume_on_thread_pool(work_groups_thread_pool, scheduling_finished_barrier,
                                                       work_group_awaitable);
+                    unfinished_work_groups += 1;
                 }
             }
+
+            scheduling_finished_barrier->reset(unfinished_work_groups);
         }
     }
 
@@ -182,7 +185,7 @@ namespace wavy::utils {
         bool done = false;
         while (!done) {
             scheduler.when_ready().m_coroutine.resume();
-            done = scheduler.when_ready().m_coroutine.done();
+            done = scheduler.is_ready();
         }
     }
 }

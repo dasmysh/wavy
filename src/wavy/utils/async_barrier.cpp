@@ -24,6 +24,12 @@ namespace wavy::utils {
         m_barrier_hit.store(m_initial_count <= 0);
     }
 
+    void async_barrier::reset(std::ptrdiff_t new_initial_count) noexcept
+    {
+        m_initial_count = new_initial_count;
+        reset();
+    }
+
     void async_barrier::count_down(std::ptrdiff_t n /*= 1*/) noexcept
     {
         if (m_count.fetch_sub(n, std::memory_order_acq_rel) <= n) { m_barrier_hit.store(true); }
