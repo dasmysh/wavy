@@ -14,8 +14,41 @@
 #include <spdlog/spdlog.h>
 #include <numeric>
 
+#define THREADSAVE_CHECK_EQ(atomic_var, a, b) \
+{ \
+    bool expected = true; \
+    atomic_var.compare_exchange_strong(expected, a == b); \
+    if (!expected) { \
+        spdlog::error(#a "({}) != " #b "({})", a, b); \
+    } \
+}
+
 namespace wavy::utils
 {
+    namespace detail
+    {
+        struct cs_kernel_local_info
+        {
+            cs_kernel_local_info(const work_group_info& winfo, const glm::uvec3& global_invocation_id)
+                : work_group_index{winfo.work_group_id.z * winfo.num_work_groups.y * winfo.num_work_groups.x
+                                   + winfo.work_group_id.y * winfo.num_work_groups.x + winfo.work_group_id.x}
+                , global_size{winfo.num_work_groups * winfo.work_group_size}
+                , global_work_group_start_offset{winfo.work_group_id * winfo.work_group_size}
+                , global_invocation_index{global_invocation_id.z * global_size.y * global_size.x
+                                          + global_invocation_id.y * global_size.x + global_invocation_id.x}
+                , global_work_group_start_index{global_work_group_start_offset.z * global_size.y * global_size.x
+                                          + global_work_group_start_offset.y * global_size.x
+                                          + global_work_group_start_offset.x}
+            {}
+
+            std::size_t work_group_index = 0;
+            glm::uvec3 global_size;
+            glm::uvec3 global_work_group_start_offset;
+            std::size_t global_invocation_index = 0;
+            std::size_t global_work_group_start_index = 0;
+        };
+    }
+
     cppcoro::task<> resume_on_thread_pool_test(cppcoro::static_thread_pool& tp,
                                           std::shared_ptr<async_barrier> scheduling_finsied_barrier,
                                           const cppcoro::task<>& kernel)
@@ -168,30 +201,18 @@ namespace wavy::utils
                        &atomic_all_invocation_indices_correct_1d, &atomic_all_invocation_indices_correct](
                           work_group_info winfo, glm::uvec3 local_invocation_id, glm::uvec3 global_invocation_id,
                           unsigned local_invocation_index) -> cppcoro::task<> {
-            [[maybe_unused]] std::size_t current_work_group =
-                winfo.work_group_id.z * winfo.num_work_groups.y * winfo.num_work_groups.x
-                + winfo.work_group_id.y * winfo.num_work_groups.x + winfo.work_group_id.x;
-            bool expected = true;
-            atomic_all_work_groups_indices_correct.compare_exchange_strong(expected,
-                                                                           current_work_group
-                                                                               == winfo.work_group_id.x); // 1D!!
+            detail::cs_kernel_local_info local_info{winfo, global_invocation_id};
 
-            auto global_size = winfo.num_work_groups * winfo.work_group_size;
-            auto global_work_group_id = winfo.work_group_id * winfo.work_group_size;
-            std::size_t current_global_invocation_index = global_invocation_id.z * global_size.y * global_size.x
-                                                          + global_invocation_id.y * global_size.x
-                                                          + global_invocation_id.x;
-            [[maybe_unused]] std::size_t global_work_group_index =
-                global_work_group_id.z * global_size.y * global_size.x + global_work_group_id.y * global_size.x
-                + global_work_group_id.x;
+            THREADSAVE_CHECK_EQ(atomic_all_work_groups_indices_correct, local_info.work_group_index,
+                                winfo.work_group_id.x);
 
-            expected = true;
-            atomic_all_invocation_indices_correct_1d.compare_exchange_strong(
-                expected, current_global_invocation_index == global_invocation_id.x); // 1D!!
-            expected = true;
-            atomic_all_invocation_indices_correct.compare_exchange_strong(
-                expected, current_global_invocation_index == global_work_group_index + local_invocation_index);
-            thread_executed[current_global_invocation_index] = true;
+            THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct_1d, local_info.global_invocation_index,
+                                global_invocation_id.x);
+
+            THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct, local_info.global_invocation_index,
+                                local_info.global_work_group_start_index + local_invocation_index);
+
+            thread_executed[local_info.global_invocation_index] = true;
             co_return;
         };
 
