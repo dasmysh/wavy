@@ -32,6 +32,7 @@ namespace wavy::utils
             cs_kernel_local_info(const work_group_info& winfo, const glm::uvec3& global_invocation_id)
                 : work_group_index{winfo.work_group_id.z * winfo.num_work_groups.y * winfo.num_work_groups.x
                                    + winfo.work_group_id.y * winfo.num_work_groups.x + winfo.work_group_id.x}
+                , work_group_size_linear{winfo.work_group_size.x * winfo.work_group_size.y * winfo.work_group_size.z}
                 , global_size{winfo.num_work_groups * winfo.work_group_size}
                 , global_work_group_start_offset{winfo.work_group_id * winfo.work_group_size}
                 , global_invocation_index{global_invocation_id.z * global_size.y * global_size.x
@@ -42,6 +43,7 @@ namespace wavy::utils
             {}
 
             std::size_t work_group_index = 0;
+            std::size_t work_group_size_linear = 0;
             glm::uvec3 global_size;
             glm::uvec3 global_work_group_start_offset;
             std::size_t global_invocation_index = 0;
@@ -139,23 +141,22 @@ namespace wavy::utils
 
     TEST_CASE("wavy::utils::emulate_compute_shader.multiple threads in one workgroup 1D", "")
     {
-        std::vector<bool> thread_executed(100, false);
+        std::vector<std::uint8_t> thread_executed(100, std::uint8_t(0));
         auto kernel = [&thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
                                                 glm::uvec3 global_invocation_id,
                                                 unsigned local_invocation_index) -> cppcoro::task<> {
-            thread_executed[local_invocation_index] = true;
+            thread_executed[local_invocation_index] = 1;
             co_return;
         };
 
         emulate_compute_shader(glm::uvec3{1}, glm::uvec3{100, 1, 1}, 0, kernel);
 
-        for (bool executed : thread_executed) { CHECK(executed == true); }
+        for (const auto& executed : thread_executed) { CHECK(executed == 1); }
     }
 
     TEST_CASE("wavy::utils::emulate_compute_shader.multiple threads in one workgroup 2D", "")
     {
-        std::vector<std::uint8_t> thread_executed_linear(100,
-                                                         std::uint8_t(0)); // std::vector<bool> seems to have no .data()
+        std::vector<std::uint8_t> thread_executed_linear(100, std::uint8_t(0));
         std::mdspan<std::uint8_t, std::dextents<std::size_t, 2>> thread_executed(thread_executed_linear.data(), 10, 10);
 
         auto kernel = [&thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
@@ -173,7 +174,7 @@ namespace wavy::utils
     TEST_CASE("wavy::utils::emulate_compute_shader.multiple threads in one workgroup 3D", "")
     {
         std::vector<std::uint8_t> thread_executed_linear(125,
-                                                         std::uint8_t(0)); // std::vector<bool> seems to have no .data()
+                                                         std::uint8_t(0));
         std::mdspan<std::uint8_t, std::dextents<std::size_t, 3>> thread_executed(thread_executed_linear.data(), 5, 5,
                                                                                  5);
 
@@ -192,7 +193,7 @@ namespace wavy::utils
 
     TEST_CASE("wavy::utils::emulate_compute_shader.multiple threads in multiple workgroups 1D/1D", "")
     {
-        std::vector<bool> thread_executed(100, false);
+        std::vector<std::uint8_t> thread_executed(10000, 0);
         std::atomic_bool atomic_all_work_groups_indices_correct = true;
         std::atomic_bool atomic_all_invocation_indices_correct_1d = true;
         std::atomic_bool atomic_all_invocation_indices_correct = true;
@@ -212,11 +213,11 @@ namespace wavy::utils
             THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct, local_info.global_invocation_index,
                                 local_info.global_work_group_start_index + local_invocation_index);
 
-            thread_executed[local_info.global_invocation_index] = true;
+            thread_executed[local_info.global_invocation_index] = 1;
             co_return;
         };
 
-        emulate_compute_shader(glm::uvec3{10, 1, 1}, glm::uvec3{10, 1, 1}, 0, kernel);
+        emulate_compute_shader(glm::uvec3{100, 1, 1}, glm::uvec3{100, 1, 1}, 0, kernel);
 
         bool all_work_groups_indices_correct = atomic_all_work_groups_indices_correct.load();
         bool all_invocation_indices_correct_1d = atomic_all_invocation_indices_correct_1d.load();
@@ -225,11 +226,82 @@ namespace wavy::utils
         CHECK(all_invocation_indices_correct_1d == true);
         CHECK(all_invocation_indices_correct == true);
 
-        for (bool executed : thread_executed) { CHECK(executed == true); }
+        for (const auto& executed : thread_executed) { CHECK(executed == 1); }
     }
-            thread_executed[current_global_invocation_index] = true;
+
+    TEST_CASE("wavy::utils::emulate_compute_shader.multiple threads in multiple workgroups 2D/2D", "")
+    {
+        std::vector<std::uint8_t> thread_executed_linear(10000, false);
+        std::mdspan<std::uint8_t, std::dextents<std::size_t, 2>> thread_executed(thread_executed_linear.data(), 100,
+                                                                                 100);
+        std::array<std::atomic_bool, 2> atomic_all_invocation_indices_correct{true, true};
+
+        auto kernel = [&thread_executed, &atomic_all_invocation_indices_correct](
+                          work_group_info winfo, glm::uvec3 local_invocation_id,
+                                         glm::uvec3 global_invocation_id,
+                                         unsigned local_invocation_index) -> cppcoro::task<> {
+            detail::cs_kernel_local_info local_info{winfo, global_invocation_id};
+
+
+            THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct[0], local_info.global_invocation_index,
+                                local_info.global_work_group_start_index + local_invocation_index);
+
+            THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct[1], local_info.global_invocation_index,
+                                local_info.work_group_index * local_info.work_group_size_linear
+                                    + local_invocation_index);
+
+
+            thread_executed[std::array<std::size_t, 2>{global_invocation_id.x, global_invocation_id.y}] = true;
             co_return;
         };
+
+        emulate_compute_shader(glm::uvec3{10, 10, 1}, glm::uvec3{10, 10, 1}, 0, kernel);
+
+        bool all_invocation_indices_correct_0 = atomic_all_invocation_indices_correct[0].load();
+        bool all_invocation_indices_correct_1 = atomic_all_invocation_indices_correct[1].load();
+        CHECK(all_invocation_indices_correct_0 == true);
+        CHECK(all_invocation_indices_correct_1 == true);
+
+        for (const auto& executed : thread_executed_linear) { CHECK(executed == 1); }
+    }
+
+    TEST_CASE("wavy::utils::emulate_compute_shader.multiple threads in multiple workgroups 3D/3D", "")
+    {
+        std::vector<std::uint8_t> thread_executed_linear(15625, false);
+        std::mdspan<std::uint8_t, std::dextents<std::size_t, 3>> thread_executed(thread_executed_linear.data(), 25, 25,
+                                                                                 25);
+        std::array<std::atomic_bool, 2> atomic_all_invocation_indices_correct{true, true};
+
+        auto kernel = [&thread_executed, &atomic_all_invocation_indices_correct](
+                          work_group_info winfo, glm::uvec3 local_invocation_id,
+                                         glm::uvec3 global_invocation_id,
+                          unsigned local_invocation_index) -> cppcoro::task<> {
+            detail::cs_kernel_local_info local_info{winfo, global_invocation_id};
+
+            THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct[0], local_info.global_invocation_index,
+                                local_info.global_work_group_start_index + local_invocation_index);
+
+            THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct[1], local_info.global_invocation_index,
+                                local_info.work_group_index * local_info.work_group_size_linear
+                                    + local_invocation_index);
+
+
+            thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
+                                                       global_invocation_id.z}] = true;
+            co_return;
+        };
+
+        emulate_compute_shader(glm::uvec3{5, 5, 5}, glm::uvec3{5, 5, 5}, 0, kernel);
+
+        bool all_invocation_indices_correct_0 = atomic_all_invocation_indices_correct[0].load();
+        bool all_invocation_indices_correct_1 = atomic_all_invocation_indices_correct[1].load();
+        CHECK(all_invocation_indices_correct_0 == true);
+        CHECK(all_invocation_indices_correct_1 == true);
+
+        for (const auto& executed : thread_executed_linear) { CHECK(executed == 1); }
+    }
+
+
     TEST_CASE("wavy::utils::emulate_compute_shader.playground", "")
     {
 
