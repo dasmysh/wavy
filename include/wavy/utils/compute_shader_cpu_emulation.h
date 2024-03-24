@@ -15,10 +15,7 @@
 #include <cppcoro/static_thread_pool.hpp>
 #include <cppcoro/task.hpp>
 #include <glm/vec3.hpp>
-#pragma warning(push)
-#pragma warning(disable : 5246)
 #include <mdspan>
-#pragma warning(pop)
 
 namespace wavy::utils {
 
@@ -67,8 +64,8 @@ namespace wavy::utils {
                         local_invocation_id.z * winfo.work_group_size.x * winfo.work_group_size.y
                         + local_invocation_id.y * winfo.work_group_size.x + local_invocation_id.x;
 
-                    auto& awaitable = awaitables[std::array<std::size_t, 3>{{lix, liy, liz}}];
-                    auto& kernel_awaitable = kernel_awaitables[std::array<std::size_t, 3>{{lix, liy, liz}}];
+                    auto& awaitable = awaitables[std::array<std::size_t, 3>{lix, liy, liz}];
+                    auto& kernel_awaitable = kernel_awaitables[std::array<std::size_t, 3>{lix, liy, liz}];
                     kernel_awaitable = kernel(winfo, local_invocation_id, global_invocation_id, local_invocation_index);
                     awaitable =
                         resume_on_thread_pool(*worker_thread_pool, scheduling_finished_barrier, kernel_awaitable);
@@ -131,20 +128,20 @@ namespace wavy::utils {
                     glm::uvec3 work_group_id{wix, wiy, wiz};
 
                     auto& barrier =
-                        barriers[std::array<std::size_t, 3>{{work_group_id.x, work_group_id.y, work_group_id.z}}];
+                        barriers[std::array<std::size_t, 3>{work_group_id.x, work_group_id.y, work_group_id.z}];
                     barrier = std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(work_group_size_linear));
-                    work_group_info winfo{
-                        .num_work_groups = work_groups,
-                        .work_group_size = work_group_size,
-                        .work_group_id = work_group_id,
-                        .barrier = barrier,
-                        .shared_memory{shared_memory_size > 0 ? &shared_memory[std::array<std::size_t, 4>{
-                                           {0, work_group_id.x, work_group_id.y, work_group_id.z}}]
-                                                              : nullptr,
-                                       shared_memory_size}};
+                    work_group_info winfo{.num_work_groups = work_groups,
+                                          .work_group_size = work_group_size,
+                                          .work_group_id = work_group_id,
+                                          .barrier = barrier,
+                                          .shared_memory{shared_memory_size > 0
+                                                             ? &shared_memory[std::array<std::size_t, 4>{
+                                                                 0, work_group_id.x, work_group_id.y, work_group_id.z}]
+                                                             : nullptr,
+                                                         shared_memory_size}};
 
                     auto& awaitable = awaitables[std::array<std::size_t, 3>{{wix, wiy, wiz}}];
-                    auto& work_group_awaitable = work_group_awaitables[std::array<std::size_t, 3>{{wix, wiy, wiz}}];
+                    auto& work_group_awaitable = work_group_awaitables[std::array<std::size_t, 3>{wix, wiy, wiz}];
 
                     work_group_awaitable =
                         schedule_emulated_compute_shader_work_group(worker_thread_pool, winfo, kernel);

@@ -6,8 +6,8 @@
  * @brief  Tests for the for_each compute shader emulation.
  */
 
-#include "utils/compute_shader_cpu_emulation.h"
-#include "utils/zip.h"
+#include <utils/compute_shader_cpu_emulation.h>
+#include <utils/zip.h>
 
 #include <catch.hpp>
 #include <cppcoro/when_all.hpp>
@@ -16,7 +16,7 @@
 
 namespace wavy::utils
 {
-    cppcoro::task<> resume_on_thread_pool(cppcoro::static_thread_pool& tp,
+    cppcoro::task<> resume_on_thread_pool_test(cppcoro::static_thread_pool& tp,
                                           std::shared_ptr<async_barrier> scheduling_finsied_barrier,
                                           const cppcoro::task<>& kernel)
     {
@@ -38,14 +38,14 @@ namespace wavy::utils
         std::vector<cppcoro::task<>> work_awaitables(items.size());
         auto scheduling_finished_barrier = std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(items.size()));
 
-        std::ranges::for_each(zip(items, awaitables, work_awaitables),
-                              [&tp, &work, &scheduling_finished_barrier](auto item_awaitables) {
-                                  auto& item = std::get<0>(item_awaitables);
-                                  auto& awaitable = std::get<1>(item_awaitables);
-                                  auto& work_awaitable = std::get<2>(item_awaitables);
-                                  work_awaitable = work(item);
-                                  awaitable = resume_on_thread_pool(*tp, scheduling_finished_barrier, work_awaitable);
-                              });
+        std::ranges::for_each(
+            zip(items, awaitables, work_awaitables), [&tp, &work, &scheduling_finished_barrier](auto item_awaitables) {
+                auto& item = std::get<0>(item_awaitables);
+                auto& awaitable = std::get<1>(item_awaitables);
+                auto& work_awaitable = std::get<2>(item_awaitables);
+                work_awaitable = work(item);
+                awaitable = resume_on_thread_pool_test(*tp, scheduling_finished_barrier, work_awaitable);
+            });
 
         std::size_t resume_counter = 0;
         bool all_kernels_done = false;
@@ -65,8 +65,8 @@ namespace wavy::utils
                                       auto ready = work_awaitable.is_ready();
                                       if (!ready) {
                                           all_kernels_done = false;
-                                          awaitable =
-                                              resume_on_thread_pool(*tp, scheduling_finished_barrier, work_awaitable);
+                                          awaitable = resume_on_thread_pool_test(*tp, scheduling_finished_barrier,
+                                                                                 work_awaitable);
                                       }
                                   });
 
@@ -103,7 +103,6 @@ namespace wavy::utils
         auto barrier = std::make_shared<async_barrier>(num_elements);
 
         auto work = [barrier](int i) -> cppcoro::task<> {
-
             spdlog::info("doing work: {} 1/3.", i);
 
             co_await *barrier;
@@ -124,9 +123,29 @@ namespace wavy::utils
             done = scheduler.when_ready().m_coroutine.done();
         }
 
-
         spdlog::error("scheduling finished.");
-        // emulate_compute_shader(glm::uvec3{1}, glm::uvec3{1}, 0,
-        //                        [](work_group_info, glm::uvec3, glm::uvec3, unsigned) -> cppcoro::task<> { co_return; });
+        emulate_compute_shader(glm::uvec3{1}, glm::uvec3{1}, 0,
+                               [](work_group_info winfo, glm::uvec3 local_invocation_id,
+                                  glm::uvec3 global_invocation_id, unsigned local_invocation_index) -> cppcoro::task<> {
+                                   spdlog::info("doing cs work: ({}, {}, {})) / ({}, {}, {}) / {} 1/3.",
+                                                local_invocation_id.x, local_invocation_id.y, local_invocation_id.z,
+                                                global_invocation_id.x, global_invocation_id.y, global_invocation_id.z,
+                                                local_invocation_index);
+
+                                   co_await *winfo.barrier;
+
+                                   spdlog::info("doing cs work: ({}, {}, {})) / ({}, {}, {}) / {} 2/3.",
+                                                local_invocation_id.x, local_invocation_id.y, local_invocation_id.z,
+                                                global_invocation_id.x, global_invocation_id.y, global_invocation_id.z,
+                                                local_invocation_index);
+
+                                   co_await *winfo.barrier;
+
+                                   spdlog::info("doing cs work: ({}, {}, {})) / ({}, {}, {}) / {} 3/3.",
+                                                local_invocation_id.x, local_invocation_id.y, local_invocation_id.z,
+                                                global_invocation_id.x, global_invocation_id.y, global_invocation_id.z,
+                                                local_invocation_index);
+                                   co_return;
+                               });
     }
 }

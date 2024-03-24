@@ -38,7 +38,6 @@ function(set_project_warnings project_name)
       /w14928 # illegal copy-initialization; more than one user-defined
               # conversion has been implicitly applied
       /w15038
-      /w15246
       /permissive-
       /volatile:iso
       /MP
