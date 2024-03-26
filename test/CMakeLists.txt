@@ -5,6 +5,7 @@ add_library(catch_main STATIC catch_main.cpp ${TOP_FILES})
 target_link_libraries(catch_main PUBLIC ${APPLICATION_NAME}_options ${APPLICATION_NAME}_warnings Catch2::Catch2 Catch2::Catch2WithMain angelscript_helper)
 target_compile_definitions(catch_main PUBLIC CATCH_AMALGAMATED_CUSTOM_MAIN)
 set_target_properties(catch_main PROPERTIES FOLDER "tests")
+set_project_static_analyzer(catch_main)
 
 include(CTest)
 include(Catch)

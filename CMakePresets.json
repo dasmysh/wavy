@@ -16,6 +16,7 @@
       "cacheVariables": {
         "VCPKG_MANIFEST_DIR": "${sourceDir}",
         "VCPKG_TARGET_TRIPLET": "x64-windows",
+        "VCPKG_HOST_TRIPLET": "x64-windows",
         "WAVY_ENABLE_ADDRESS_SANITIZER": false
       },
       "condition": {
@@ -34,6 +35,7 @@
         "cacheVariables": {
           "VCPKG_MANIFEST_DIR": "${sourceDir}",
           "VCPKG_TARGET_TRIPLET": "x64-windows-asan",
+          "VCPKG_HOST_TRIPLET": "x64-windows",
           "WAVY_ENABLE_ADDRESS_SANITIZER": true
         },
         "condition": {
@@ -51,7 +53,8 @@
         "binaryDir": "${sourceDir}/build.ninja/${presetName}",
         "cacheVariables": {
           "VCPKG_MANIFEST_DIR": "${sourceDir}",
-          "VCPKG_TARGET_TRIPLET": "x64-windows"
+          "VCPKG_TARGET_TRIPLET": "x64-windows",
+          "VCPKG_HOST_TRIPLET": "x64-windows"
         }
     },
     {
@@ -64,6 +67,7 @@
         "cacheVariables": {
           "VCPKG_MANIFEST_DIR": "${sourceDir}",
           "VCPKG_TARGET_TRIPLET": "x64-windows-asan",
+          "VCPKG_HOST_TRIPLET": "x64-windows",
           "WAVY_ENABLE_ADDRESS_SANITIZER": true
         }
     }
