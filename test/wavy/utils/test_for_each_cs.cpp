@@ -179,4 +179,38 @@ namespace wavy::utils
     {
         run_simple_test(glm::uvec3{5, 5, 5}, glm::uvec3{100, 1, 1});
     }
+
+    TEST_CASE("wavy::utils::emulate_compute_shader.barriers", "")
+    {
+        constexpr glm::uvec3 work_groups{5, 2, 7};
+        constexpr std::size_t work_groups_linear = work_groups.x * work_groups.y * work_groups.z;
+        constexpr glm::uvec3 work_group_size{3, 6, 4};
+        constexpr std::size_t work_group_size_linear = work_group_size.x * work_group_size.y * work_group_size.z;
+
+        std::vector<std::uint8_t> thread_executed_linear(work_groups_linear * work_group_size_linear, 0);
+        std::mdspan global_thread_executed(thread_executed_linear.data(), work_groups.x * work_group_size.x,
+                                           work_groups.y * work_group_size.y, work_groups.z * work_group_size.z);
+
+        auto kernel = [&global_thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
+                                                glm::uvec3 global_invocation_id,
+                                                unsigned local_invocation_index) -> coro::task<> {
+            global_thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
+                                                              global_invocation_id.z}] += 1;
+
+            co_await *winfo.barrier;
+
+            global_thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
+                                                              global_invocation_id.z}] += 1;
+
+            co_await *winfo.barrier;
+
+            global_thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
+                                                              global_invocation_id.z}] += 1;
+            co_return;
+        };
+
+        emulate_compute_shader(work_groups, work_group_size, 0, kernel);
+
+        for (const auto& executed : thread_executed_linear) { CHECK(executed == 3); }
+    }
 }
