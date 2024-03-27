@@ -10,7 +10,6 @@
 #include <utils/zip.h>
 
 #include <catch.hpp>
-#include <cppcoro/when_all.hpp>
 #include <spdlog/spdlog.h>
 #include <numeric>
 
@@ -55,11 +54,11 @@ namespace wavy::utils
         };
     }
 
-    cppcoro::task<> resume_on_thread_pool_test(cppcoro::static_thread_pool& tp,
-                                          std::shared_ptr<async_barrier> scheduling_finsied_barrier,
-                                          const cppcoro::task<>& kernel)
+    coro::task<> resume_on_thread_pool_test(coro::thread_pool& tp,
+                                            std::shared_ptr<async_barrier> scheduling_finsied_barrier,
+                                            coro::task<>& kernel)
     {
-        auto coroutine = kernel.when_ready().m_coroutine;
+        auto coroutine = kernel.handle();
         co_await tp.schedule();
         coroutine.resume();
         spdlog::error("resumed kernel done.");
@@ -67,14 +66,14 @@ namespace wavy::utils
     }
 
     template<typename Pred>
-    cppcoro::task<> run_all_items(std::shared_ptr<cppcoro::static_thread_pool> tp,
+    coro::task<> run_all_items(std::shared_ptr<coro::thread_pool> tp,
                                   std::shared_ptr<async_barrier> barrier,
                                   const std::vector<int>& items, Pred work)
     {
         spdlog::info("tasks ({}) created, starting...", items.size());
 
-        std::vector<cppcoro::task<>> awaitables(items.size());
-        std::vector<cppcoro::task<>> work_awaitables(items.size());
+        std::vector<coro::task<>> awaitables(items.size());
+        std::vector<coro::task<>> work_awaitables(items.size());
         auto scheduling_finished_barrier = std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(items.size()));
 
         std::ranges::for_each(
@@ -89,7 +88,7 @@ namespace wavy::utils
         std::size_t resume_counter = 0;
         bool all_kernels_done = false;
         while (!all_kernels_done) {
-            for (const auto& awaitable : awaitables) { awaitable.when_ready().m_coroutine.resume(); }
+            for (auto& awaitable : awaitables) { awaitable.resume(); }
 
             while (!scheduling_finished_barrier->is_ready()) { co_await scheduling_finished_barrier->scheduling(); }
 
@@ -117,7 +116,7 @@ namespace wavy::utils
         co_return;
     }
 
-    cppcoro::task<> work_wrapper(auto&& work, auto& barrier)
+    coro::task<> work_wrapper(auto&& work, auto& barrier)
     {
         spdlog::info("task created, starting: ");
         work.when_ready().m_coroutine.resume();
@@ -133,7 +132,7 @@ namespace wavy::utils
         bool single_thread_executed = false;
         auto kernel = [&single_thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
                                                 glm::uvec3 global_invocation_id,
-                                                unsigned local_invocation_index) -> cppcoro::task<> {
+                                                unsigned local_invocation_index) -> coro::task<> {
             single_thread_executed = true;
             co_return;
         };
@@ -147,8 +146,8 @@ namespace wavy::utils
     {
         std::vector<std::uint8_t> thread_executed(100, std::uint8_t(0));
         auto kernel = [&thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
-                                                glm::uvec3 global_invocation_id,
-                                                unsigned local_invocation_index) -> cppcoro::task<> {
+                                         glm::uvec3 global_invocation_id,
+                                         unsigned local_invocation_index) -> coro::task<> {
             thread_executed[local_invocation_index] = 1;
             co_return;
         };
@@ -165,7 +164,7 @@ namespace wavy::utils
 
         auto kernel = [&thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
                                          glm::uvec3 global_invocation_id,
-                                         unsigned local_invocation_index) -> cppcoro::task<> {
+                                         unsigned local_invocation_index) -> coro::task<> {
             thread_executed[std::array<std::size_t, 2>{global_invocation_id.x, global_invocation_id.y}] = 1;
             co_return;
         };
@@ -184,7 +183,7 @@ namespace wavy::utils
 
         auto kernel = [&thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
                                          glm::uvec3 global_invocation_id,
-                                         unsigned local_invocation_index) -> cppcoro::task<> {
+                                         unsigned local_invocation_index) -> coro::task<> {
             thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
                                                        global_invocation_id.z}] = 1;
             co_return;
@@ -213,7 +212,7 @@ namespace wavy::utils
         auto kernel = [&thread_executed, &local_thread_counts, &atomic_all_work_groups_indices_correct,
                        &atomic_all_invocation_indices_correct_1d, &atomic_all_invocation_indices_correct](
                           work_group_info winfo, glm::uvec3 local_invocation_id, glm::uvec3 global_invocation_id,
-                          unsigned local_invocation_index) -> cppcoro::task<> {
+                          unsigned local_invocation_index) -> coro::task<> {
             detail::cs_kernel_local_info local_info{winfo, global_invocation_id, local_invocation_id};
 
             THREADSAVE_CHECK_EQ(atomic_all_work_groups_indices_correct, local_info.work_group_index,
@@ -267,12 +266,11 @@ namespace wavy::utils
         auto kernel = [&thread_executed, &local_thread_count, &atomic_all_invocation_indices_correct](
                           work_group_info winfo, glm::uvec3 local_invocation_id,
                                          glm::uvec3 global_invocation_id,
-                                         unsigned local_invocation_index) -> cppcoro::task<> {
+                          unsigned local_invocation_index) -> coro::task<> {
             detail::cs_kernel_local_info local_info{winfo, global_invocation_id, local_invocation_id};
 
             THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct, local_info.global_invocation_index,
                                 local_info.global_work_group_start_index + local_info.local_index_as_global_offset);
-
 
             thread_executed[std::array<std::size_t, 2>{global_invocation_id.x, global_invocation_id.y}] = 1;
             local_thread_count[std::array<std::size_t, 2>{local_invocation_id.x, local_invocation_id.y}] += 1;
@@ -308,35 +306,34 @@ namespace wavy::utils
         std::mdspan<std::atomic_size_t, std::dextents<std::size_t, 3>> local_thread_count(
             local_thread_count_linear.data(), work_group_size.x, work_group_size.y, work_group_size.z);
 
-        std::array<std::atomic_bool, 2> atomic_all_invocation_indices_correct{true, true};
+        std::atomic_bool atomic_all_invocation_indices_correct = true;
 
-        auto kernel = [&thread_executed, &atomic_all_invocation_indices_correct](
+        auto kernel = [&thread_executed, &local_thread_count, &atomic_all_invocation_indices_correct](
                           work_group_info winfo, glm::uvec3 local_invocation_id,
                                          glm::uvec3 global_invocation_id,
-                          unsigned local_invocation_index) -> cppcoro::task<> {
+                          unsigned local_invocation_index) -> coro::task<> {
             detail::cs_kernel_local_info local_info{winfo, global_invocation_id, local_invocation_id};
 
-            THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct[0], local_info.global_invocation_index,
-                                local_info.global_work_group_start_index + local_invocation_index);
-
-            THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct[1], local_info.global_invocation_index,
-                                local_info.work_group_index * local_info.work_group_size_linear
-                                    + local_invocation_index);
-
+            THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct, local_info.global_invocation_index,
+                                local_info.global_work_group_start_index + local_info.local_index_as_global_offset);
 
             thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
                                                        global_invocation_id.z}] = 1;
+            local_thread_count[std::array<std::size_t, 3>{local_invocation_id.x, local_invocation_id.y,
+                                                          local_invocation_id.z}] += 1;
             co_return;
         };
 
         emulate_compute_shader(work_groups, work_group_size, 0, kernel);
 
-        bool all_invocation_indices_correct_0 = atomic_all_invocation_indices_correct[0].load();
-        bool all_invocation_indices_correct_1 = atomic_all_invocation_indices_correct[1].load();
-        CHECK(all_invocation_indices_correct_0 == true);
-        CHECK(all_invocation_indices_correct_1 == true);
+        bool all_invocation_indices_correct = atomic_all_invocation_indices_correct.load();
+        CHECK(all_invocation_indices_correct == true);
 
         for (const auto& executed : thread_executed_linear) { CHECK(executed == 1); }
+        for (const auto& work_group_count_atomic : local_thread_count_linear) {
+            auto work_group_count = work_group_count_atomic.load();
+            CHECK(work_group_count == work_groups_linear);
+        }
     }
 
 
@@ -345,7 +342,7 @@ namespace wavy::utils
 
         spdlog::info("Starting parallel tasks with {} threads", std::thread::hardware_concurrency());
 
-        auto tp = std::make_shared<cppcoro::static_thread_pool>(2);
+        auto tp = std::make_shared<coro::thread_pool>(coro::thread_pool::options{.thread_count = 2});
 
         constexpr std::size_t num_elements = 6;
 
@@ -354,7 +351,7 @@ namespace wavy::utils
 
         auto barrier = std::make_shared<async_barrier>(num_elements);
 
-        auto work = [barrier](int i) -> cppcoro::task<> {
+        auto work = [barrier](int i) -> coro::task<> {
             spdlog::info("doing work: {} 1/3.", i);
 
             co_await *barrier;
@@ -371,14 +368,14 @@ namespace wavy::utils
 
         bool done = false;
         while (!done) {
-            scheduler.when_ready().m_coroutine.resume();
-            done = scheduler.when_ready().m_coroutine.done();
+            scheduler.resume();
+            done = scheduler.is_ready();
         }
 
         spdlog::error("scheduling finished.");
         emulate_compute_shader(glm::uvec3{1}, glm::uvec3{1}, 0,
                                [](work_group_info winfo, glm::uvec3 local_invocation_id,
-                                  glm::uvec3 global_invocation_id, unsigned local_invocation_index) -> cppcoro::task<> {
+                                  glm::uvec3 global_invocation_id, unsigned local_invocation_index) -> coro::task<> {
                                    spdlog::info("doing cs work: ({}, {}, {})) / ({}, {}, {}) / {} 1/3.",
                                                 local_invocation_id.x, local_invocation_id.y, local_invocation_id.z,
                                                 global_invocation_id.x, global_invocation_id.y, global_invocation_id.z,

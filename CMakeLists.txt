@@ -41,7 +41,8 @@ target_compile_definitions(${APPLICATION_NAME}_options INTERFACE VULKAN_HPP_TYPE
 
 find_package(Catch2 CONFIG REQUIRED)
 find_package(cereal CONFIG REQUIRED)
-find_package(cppcoro CONFIG REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(libcoro REQUIRED IMPORTED_TARGET libcoro)
 find_package(docopt CONFIG REQUIRED)
 find_package(Angelscript CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)

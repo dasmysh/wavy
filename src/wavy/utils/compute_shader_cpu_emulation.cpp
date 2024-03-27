@@ -10,11 +10,10 @@
 
 namespace wavy::utils {
 
-    cppcoro::task<> resume_on_thread_pool(cppcoro::static_thread_pool& tp,
-                                                             std::shared_ptr<async_barrier> scheduling_finsied_barrier,
-                                                             const cppcoro::task<>& kernel)
+    coro::task<> resume_on_thread_pool(coro::thread_pool& tp, std::shared_ptr<async_barrier> scheduling_finsied_barrier,
+                                       coro::task<>& kernel)
     {
-        auto coroutine = kernel.when_ready().m_coroutine;
+        auto coroutine = kernel.handle();
         co_await tp.schedule();
         coroutine.resume();
         scheduling_finsied_barrier->count_down();

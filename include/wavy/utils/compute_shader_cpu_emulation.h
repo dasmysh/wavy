@@ -10,10 +10,9 @@
 
 #include "utils/async_barrier.h"
 
-#include <cppcoro/sync_wait.hpp>
-#include <cppcoro/when_all.hpp>
-#include <cppcoro/static_thread_pool.hpp>
-#include <cppcoro/task.hpp>
+#include <coro/sync_wait.hpp>
+#include <coro/thread_pool.hpp>
+#include <coro/task.hpp>
 #include <glm/vec3.hpp>
 #include <mdspan>
 
@@ -21,7 +20,7 @@ namespace wavy::utils {
 
     using barrier_span_type = std::mdspan<std::shared_ptr<async_barrier>, std::dextents<std::size_t, 3>>;
     using shared_memory_span_type = std::mdspan<std::uint8_t, std::dextents<std::size_t, 4>>;
-    using task_span_type = std::mdspan<cppcoro::task<>, std::dextents<std::size_t, 3>>;
+    using task_span_type = std::mdspan<coro::task<>, std::dextents<std::size_t, 3>>;
 
     struct work_group_info
     {
@@ -32,19 +31,17 @@ namespace wavy::utils {
         std::span<std::uint8_t> shared_memory;
     };
 
-    cppcoro::task<> resume_on_thread_pool(cppcoro::static_thread_pool& tp,
-                                          std::shared_ptr<async_barrier> scheduling_finsied_barrier,
-                                          const cppcoro::task<>& kernel);
+    coro::task<> resume_on_thread_pool(coro::thread_pool& tp, std::shared_ptr<async_barrier> scheduling_finsied_barrier,
+                                       coro::task<>& kernel);
 
     template<typename Pred>
-    cppcoro::task<>
-    schedule_emulated_compute_shader_work_group(std::shared_ptr<cppcoro::static_thread_pool> worker_thread_pool,
-                                                work_group_info winfo, Pred kernel)
+    coro::task<> schedule_emulated_compute_shader_work_group(std::shared_ptr<coro::thread_pool> worker_thread_pool,
+                                                             work_group_info winfo, Pred kernel)
     {
         std::size_t work_group_size_linear =
             winfo.work_group_size.x * winfo.work_group_size.y * winfo.work_group_size.z;
-        std::vector<cppcoro::task<>> awaitables_linear(work_group_size_linear);
-        std::vector<cppcoro::task<>> kernel_awaitables_linear(work_group_size_linear);
+        std::vector<coro::task<>> awaitables_linear(work_group_size_linear);
+        std::vector<coro::task<>> kernel_awaitables_linear(work_group_size_linear);
         auto scheduling_finished_barrier =
             std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(work_group_size_linear));
 
@@ -75,14 +72,12 @@ namespace wavy::utils {
 
         bool all_kernels_done = false;
         while (!all_kernels_done) {
-            for (const auto& awaitable : awaitables_linear) { awaitable.when_ready().m_coroutine.resume(); }
+            for (auto& awaitable : awaitables_linear) { awaitable.resume(); }
 
             while (!scheduling_finished_barrier->is_ready()) { co_await scheduling_finished_barrier->scheduling(); }
 
-            barrier->reset();
-            scheduling_finished_barrier->reset();
-
             all_kernels_done = true;
+            std::ptrdiff_t unfinished_work_groups = 0;
             for (std::size_t i = 0; i < awaitables_linear.size(); ++i) {
                 auto& awaitable = awaitables_linear[i];
                 auto& kernel_awaitable = kernel_awaitables_linear[i];
@@ -90,26 +85,33 @@ namespace wavy::utils {
                     all_kernels_done = false;
                     awaitable =
                         resume_on_thread_pool(*worker_thread_pool, scheduling_finished_barrier, kernel_awaitable);
+                    unfinished_work_groups += 1;
                 }
             }
+
+            assert(unfinished_work_groups == awaitables_linear.size() || unfinished_work_groups == 0);
+
+            barrier->reset();
+            scheduling_finished_barrier->reset();
         }
     }
 
     template<typename Pred>
-    cppcoro::task<> emulate_compute_shader_schedule_work_groups(const glm::uvec3& work_groups,
+    coro::task<> emulate_compute_shader_schedule_work_groups(const glm::uvec3& work_groups,
                                                                 const glm::uvec3& work_group_size,
                                                                 std::size_t shared_memory_size, Pred kernel)
     {
         std::size_t work_groups_linear = work_groups.x * work_groups.y * work_groups.z;
         std::size_t work_group_size_linear = work_group_size.x * work_group_size.y * work_group_size.z;
 
-        cppcoro::static_thread_pool work_groups_thread_pool(static_cast<std::uint32_t>(work_groups_linear));
-        auto worker_thread_pool = std::make_shared<cppcoro::static_thread_pool>();
+        coro::thread_pool work_groups_thread_pool(
+            coro::thread_pool::options{.thread_count = static_cast<std::uint32_t>(work_groups_linear)});
+        auto worker_thread_pool = std::make_shared<coro::thread_pool>();
 
         std::vector<std::shared_ptr<async_barrier>> barriers_linear(work_groups_linear);
         std::vector<std::uint8_t> shared_memory_linear(work_groups_linear * shared_memory_size);
-        std::vector<cppcoro::task<>> awaitables_linear(work_groups_linear);
-        std::vector<cppcoro::task<>> work_group_awaitables_linear(work_groups_linear);
+        std::vector<coro::task<>> awaitables_linear(work_groups_linear);
+        std::vector<coro::task<>> work_group_awaitables_linear(work_groups_linear);
 
         auto scheduling_finished_barrier =
             std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(work_groups_linear));
@@ -152,8 +154,8 @@ namespace wavy::utils {
 
         bool all_work_groups_done = false;
         while (!all_work_groups_done) {
-            for (const auto& awaitable : awaitables_linear) {
-                if (!awaitable.is_ready()) { awaitable.when_ready().m_coroutine.resume(); }
+            for (auto& awaitable : awaitables_linear) {
+                if (!awaitable.is_ready()) { awaitable.resume(); }
             }
 
             while (!scheduling_finished_barrier->is_ready()) { co_await scheduling_finished_barrier->scheduling(); }
@@ -184,7 +186,7 @@ namespace wavy::utils {
 
         bool done = false;
         while (!done) {
-            scheduler.when_ready().m_coroutine.resume();
+            scheduler.resume();
             done = scheduler.is_ready();
         }
     }
