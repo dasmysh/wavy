@@ -27,9 +27,10 @@ namespace wavy::utils
 {
     namespace detail
     {
+        template<class WorkGroupInfoType>
         struct cs_kernel_local_info
         {
-            cs_kernel_local_info(const work_group_info& winfo, const glm::uvec3& global_invocation_id,
+            cs_kernel_local_info(const WorkGroupInfoType& winfo, const glm::uvec3& global_invocation_id,
                                  const glm::uvec3& local_invocation_id)
                 : work_group_index{winfo.work_group_id.z * winfo.num_work_groups.y * winfo.num_work_groups.x
                                    + winfo.work_group_id.y * winfo.num_work_groups.x + winfo.work_group_id.x}
@@ -58,14 +59,14 @@ namespace wavy::utils
     TEST_CASE("wavy::utils::emulate_compute_shader.simple execution", "")
     {
         bool single_thread_executed = false;
-        auto kernel = [&single_thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
+        auto kernel = [&single_thread_executed](work_group_info<void> winfo, glm::uvec3 local_invocation_id,
                                                 glm::uvec3 global_invocation_id,
                                                 unsigned local_invocation_index) -> coro::task<> {
             single_thread_executed = true;
             co_return;
         };
 
-        emulate_compute_shader(glm::uvec3{1}, glm::uvec3{1}, 0, kernel);
+        emulate_compute_shader(glm::uvec3{1}, glm::uvec3{1}, kernel);
 
         CHECK(single_thread_executed == true);
     }
@@ -74,7 +75,7 @@ namespace wavy::utils
     {
     public:
         cs_test_fixture()
-            : simple_kernel{[this](work_group_info winfo, glm::uvec3 local_invocation_id,
+            : simple_kernel{[this](work_group_info<void> winfo, glm::uvec3 local_invocation_id,
                                    glm::uvec3 global_invocation_id, unsigned local_invocation_index) -> coro::task<> {
                 detail::cs_kernel_local_info local_info{winfo, global_invocation_id, local_invocation_id};
 
@@ -110,7 +111,7 @@ namespace wavy::utils
 
             atomic_all_invocation_indices_correct = true;
 
-            emulate_compute_shader(work_groups, work_group_size, 0, simple_kernel);
+            emulate_compute_shader(work_groups, work_group_size, simple_kernel);
 
             bool all_invocation_indices_correct = atomic_all_invocation_indices_correct.load();
             CHECK(all_invocation_indices_correct == true);
@@ -132,7 +133,7 @@ namespace wavy::utils
         std::mdspan<std::atomic_size_t, std::dextents<std::size_t, 3>> local_thread_counts_id;
         std::vector<std::atomic_size_t> local_thread_counts_index;
         std::atomic_bool atomic_all_invocation_indices_correct = true;
-        std::function<coro::task<>(work_group_info, glm::uvec3, glm::uvec3, unsigned)> simple_kernel;
+        std::function<coro::task<>(work_group_info<void>, glm::uvec3, glm::uvec3, unsigned)> simple_kernel;
     };
 
     TEST_CASE_METHOD(cs_test_fixture, "wavy::utils::emulate_compute_shader.multiple threads in one workgroup 1D", "")
@@ -191,7 +192,7 @@ namespace wavy::utils
         std::mdspan global_thread_executed(thread_executed_linear.data(), work_groups.x * work_group_size.x,
                                            work_groups.y * work_group_size.y, work_groups.z * work_group_size.z);
 
-        auto kernel = [&global_thread_executed](work_group_info winfo, glm::uvec3 local_invocation_id,
+        auto kernel = [&global_thread_executed](work_group_info<void> winfo, glm::uvec3 local_invocation_id,
                                                 glm::uvec3 global_invocation_id,
                                                 unsigned local_invocation_index) -> coro::task<> {
             global_thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
@@ -209,7 +210,7 @@ namespace wavy::utils
             co_return;
         };
 
-        emulate_compute_shader(work_groups, work_group_size, 0, kernel);
+        emulate_compute_shader(work_groups, work_group_size, kernel);
 
         for (const auto& executed : thread_executed_linear) { CHECK(executed == 3); }
     }
