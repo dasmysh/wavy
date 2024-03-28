@@ -10,6 +10,7 @@
 #include <utils/zip.h>
 
 #include <catch.hpp>
+#include <glm/common.hpp>
 #include <spdlog/spdlog.h>
 #include <numeric>
 
@@ -207,11 +208,95 @@ namespace wavy::utils
 
             global_thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
                                                               global_invocation_id.z}] += 1;
-            co_return;
         };
 
         emulate_compute_shader(work_groups, work_group_size, kernel);
 
         for (const auto& executed : thread_executed_linear) { CHECK(executed == 3); }
+    }
+
+    namespace testvars {
+        // constexpr glm::uvec3 work_groups{5, 2, 7};
+        constexpr glm::uvec3 work_groups{3, 3, 1};
+        constexpr std::size_t work_groups_linear = work_groups.x * work_groups.y * work_groups.z;
+        // constexpr glm::uvec3 work_group_size{3, 6, 4};
+        constexpr glm::uvec3 work_group_size{3, 3, 1};
+        constexpr std::size_t work_group_size_linear = work_group_size.x * work_group_size.y * work_group_size.z;
+    }
+
+    TEST_CASE("wavy::utils::emulate_compute_shader.shared memory", "")
+    {
+        using namespace testvars;
+        struct shared_memory
+        {
+            std::vector<std::size_t> elements = std::vector<std::size_t>(work_group_size_linear, 0);
+            std::size_t first_index = 0;
+            std::size_t last_index = 0;
+            std::atomic_bool count_correct = true;
+        };
+
+
+        std::vector<std::uint8_t> count_correct_linear(work_groups_linear, 0);
+        std::mdspan count_correct(count_correct_linear.data(), work_groups.x, work_groups.y, work_groups.z);
+
+        auto kernel = [&count_correct](work_group_info<shared_memory> winfo, glm::uvec3 local_invocation_id,
+                                                glm::uvec3 global_invocation_id,
+                                                unsigned local_invocation_index) -> coro::task<> {
+            detail::cs_kernel_local_info local_info{winfo, global_invocation_id, local_invocation_id};
+            winfo.shared_memory->elements[local_invocation_index] = local_info.global_invocation_index;
+
+            if (local_invocation_index == 0) { winfo.shared_memory->first_index = local_info.global_invocation_index; }
+            if (local_invocation_index == local_info.work_group_size_linear - 1) {
+                winfo.shared_memory->last_index = local_info.global_invocation_index;
+            }
+
+            co_await *winfo.barrier;
+
+            constexpr std::size_t cluster_size = 4;
+            if (local_invocation_index % cluster_size == 0) {
+                std::array<std::size_t, cluster_size> indices_0;
+                std::array<std::size_t, cluster_size> indices_1;
+                std::size_t sum = 0;
+                for (std::size_t i = 0; i < cluster_size; ++i) {
+                    // TODO: i am accessing memory elements that might have been written already.
+                    indices_0[i] =
+                        glm::min<std::size_t>(local_info.work_group_size_linear - 1, local_invocation_index + i);
+                    indices_1[i] = local_info.work_group_size_linear - 1 - indices_0[i];
+                    sum += winfo.shared_memory->elements[indices_0[i]] + winfo.shared_memory->elements[indices_1[i]];
+                }
+
+                if (winfo.work_group_id == glm::uvec3{0}) { __debugbreak(); }
+
+                for (std::size_t i = 0; i < cluster_size; ++i) {
+                    winfo.shared_memory->elements[indices_0[i]] = sum;
+                }
+            }
+
+            co_await *winfo.barrier;
+
+            if (winfo.shared_memory->elements[local_invocation_index]
+                != 4 * (winfo.shared_memory->first_index + winfo.shared_memory->last_index))
+            {
+                bool expected = true;
+                winfo.shared_memory->count_correct.compare_exchange_strong(expected, false);
+                if (winfo.work_group_id == glm::uvec3{0}) {
+                    spdlog::error("work_group ({}, {}, {}): {} incorrect: {}, should be {}", winfo.work_group_id.x,
+                                  winfo.work_group_id.y, winfo.work_group_id.z, local_invocation_index,
+                                  winfo.shared_memory->elements[local_invocation_index],
+                                  4 * (winfo.shared_memory->first_index + winfo.shared_memory->last_index));
+                }
+            }
+
+            co_await *winfo.barrier;
+
+            if (local_invocation_index == 0 && winfo.shared_memory->count_correct) {
+                count_correct[std::array<std::size_t, 3>{winfo.work_group_id.x, winfo.work_group_id.y,
+                                                         winfo.work_group_id.z}] = 1;
+            }
+        };
+
+        emulate_compute_shader<shared_memory>(work_groups, work_group_size, kernel);
+
+        for (const auto& count_correct_work_group : count_correct_linear) { CHECK(count_correct_work_group == 1); }
     }
 }
