@@ -215,18 +215,14 @@ namespace wavy::utils
         for (const auto& executed : thread_executed_linear) { CHECK(executed == 3); }
     }
 
-    namespace testvars {
-        // constexpr glm::uvec3 work_groups{5, 2, 7};
-        constexpr glm::uvec3 work_groups{3, 3, 1};
+    namespace test_helper {
+        constexpr glm::uvec3 work_groups{5, 2, 7};
         constexpr std::size_t work_groups_linear = work_groups.x * work_groups.y * work_groups.z;
-        // constexpr glm::uvec3 work_group_size{3, 6, 4};
-        constexpr glm::uvec3 work_group_size{3, 3, 1};
+        constexpr glm::uvec3 work_group_size{3, 6, 4};
         constexpr std::size_t work_group_size_linear = work_group_size.x * work_group_size.y * work_group_size.z;
-    }
 
-    TEST_CASE("wavy::utils::emulate_compute_shader.shared memory", "")
-    {
-        using namespace testvars;
+        constexpr std::size_t cluster_size = 4;
+
         struct shared_memory
         {
             std::vector<std::size_t> elements = std::vector<std::size_t>(work_group_size_linear, 0);
@@ -235,67 +231,97 @@ namespace wavy::utils
             std::atomic_bool count_correct = true;
         };
 
+        using work_group_info = wavy::utils::work_group_info<shared_memory>;
 
-        std::vector<std::uint8_t> count_correct_linear(work_groups_linear, 0);
-        std::mdspan count_correct(count_correct_linear.data(), work_groups.x, work_groups.y, work_groups.z);
+        void store_indices(std::size_t local_invocation_index,
+                           const detail::cs_kernel_local_info<work_group_info>& local_info, shared_memory& sm)
+        {
+            sm.elements[local_invocation_index] = local_info.global_invocation_index;
 
-        auto kernel = [&count_correct](work_group_info<shared_memory> winfo, glm::uvec3 local_invocation_id,
-                                                glm::uvec3 global_invocation_id,
-                                                unsigned local_invocation_index) -> coro::task<> {
-            detail::cs_kernel_local_info local_info{winfo, global_invocation_id, local_invocation_id};
-            winfo.shared_memory->elements[local_invocation_index] = local_info.global_invocation_index;
-
-            if (local_invocation_index == 0) { winfo.shared_memory->first_index = local_info.global_invocation_index; }
+            if (local_invocation_index == 0) { sm.first_index = local_info.global_invocation_index; }
             if (local_invocation_index == local_info.work_group_size_linear - 1) {
-                winfo.shared_memory->last_index = local_info.global_invocation_index;
+                sm.last_index = local_info.global_invocation_index;
             }
+        }
 
-            co_await *winfo.barrier;
-
-            constexpr std::size_t cluster_size = 4;
+        std::size_t calc_cluster_sum(std::size_t local_invocation_index,
+                                     const detail::cs_kernel_local_info<work_group_info>& local_info, shared_memory& sm,
+                                     std::array<std::size_t, cluster_size>& indices_0)
+        {
+            std::size_t sum = 0;
+            std::array<std::size_t, cluster_size> indices_1;
             if (local_invocation_index % cluster_size == 0) {
-                std::array<std::size_t, cluster_size> indices_0;
-                std::array<std::size_t, cluster_size> indices_1;
-                std::size_t sum = 0;
                 for (std::size_t i = 0; i < cluster_size; ++i) {
-                    // TODO: i am accessing memory elements that might have been written already.
                     indices_0[i] =
                         glm::min<std::size_t>(local_info.work_group_size_linear - 1, local_invocation_index + i);
                     indices_1[i] = local_info.work_group_size_linear - 1 - indices_0[i];
-                    sum += winfo.shared_memory->elements[indices_0[i]] + winfo.shared_memory->elements[indices_1[i]];
-                }
-
-                if (winfo.work_group_id == glm::uvec3{0}) { __debugbreak(); }
-
-                for (std::size_t i = 0; i < cluster_size; ++i) {
-                    winfo.shared_memory->elements[indices_0[i]] = sum;
+                    sum += sm.elements[indices_0[i]] + sm.elements[indices_1[i]];
                 }
             }
+            return sum;
+        }
 
-            co_await *winfo.barrier;
+        void store_sum(std::size_t local_invocation_index, const work_group_info& winfo,
+                       const std::array<std::size_t, cluster_size>& indices_0, std::size_t sum)
+        {
+            if (local_invocation_index % cluster_size == 0) {
+                for (std::size_t i = 0; i < cluster_size; ++i) { winfo.shared_memory->elements[indices_0[i]] = sum; }
+            }
+        }
 
+        void check_all_sums(std::size_t local_invocation_index, const work_group_info& winfo)
+        {
             if (winfo.shared_memory->elements[local_invocation_index]
-                != 4 * (winfo.shared_memory->first_index + winfo.shared_memory->last_index))
-            {
+                != 4 * (winfo.shared_memory->first_index + winfo.shared_memory->last_index)) {
                 bool expected = true;
                 winfo.shared_memory->count_correct.compare_exchange_strong(expected, false);
-                if (winfo.work_group_id == glm::uvec3{0}) {
-                    spdlog::error("work_group ({}, {}, {}): {} incorrect: {}, should be {}", winfo.work_group_id.x,
-                                  winfo.work_group_id.y, winfo.work_group_id.z, local_invocation_index,
-                                  winfo.shared_memory->elements[local_invocation_index],
-                                  4 * (winfo.shared_memory->first_index + winfo.shared_memory->last_index));
-                }
             }
+        }
 
-            co_await *winfo.barrier;
-
+        void propagate_checks(std::size_t local_invocation_index, const work_group_info& winfo,
+                              std::mdspan<std::uint8_t, std::dextents<std::size_t, 3>> count_correct)
+        {
             if (local_invocation_index == 0 && winfo.shared_memory->count_correct) {
                 count_correct[std::array<std::size_t, 3>{winfo.work_group_id.x, winfo.work_group_id.y,
                                                          winfo.work_group_id.z}] = 1;
             }
+        }
+    }
+
+    TEST_CASE("wavy::utils::emulate_compute_shader.shared memory", "")
+    {
+
+        std::vector<std::uint8_t> count_correct_linear(test_helper::work_groups_linear, 0);
+        std::mdspan count_correct(count_correct_linear.data(), test_helper::work_groups.x, test_helper::work_groups.y,
+                                  test_helper::work_groups.z);
+
+        auto kernel = [&count_correct](test_helper::work_group_info winfo, glm::uvec3 local_invocation_id,
+                                       glm::uvec3 global_invocation_id,
+                                       unsigned local_invocation_index) -> coro::task<> {
+            detail::cs_kernel_local_info local_info{winfo, global_invocation_id, local_invocation_id};
+            test_helper::store_indices(local_invocation_index, local_info, *winfo.shared_memory);
+
+            co_await *winfo.barrier;
+
+            std::array<std::size_t, test_helper::cluster_size> indices_0;
+            std::size_t sum =
+                test_helper::calc_cluster_sum(local_invocation_index, local_info, *winfo.shared_memory, indices_0);
+
+            co_await *winfo.barrier;
+
+            store_sum(local_invocation_index, winfo, indices_0, sum);
+
+            co_await *winfo.barrier;
+
+            check_all_sums(local_invocation_index, winfo);
+
+            co_await *winfo.barrier;
+
+            propagate_checks(local_invocation_index, winfo, count_correct);
         };
 
-        emulate_compute_shader<shared_memory>(work_groups, work_group_size, kernel);
+        emulate_compute_shader<test_helper::shared_memory>(test_helper::work_groups, test_helper::work_group_size,
+                                                           kernel);
 
         for (const auto& count_correct_work_group : count_correct_linear) { CHECK(count_correct_work_group == 1); }
     }
