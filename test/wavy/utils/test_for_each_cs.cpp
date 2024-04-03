@@ -199,12 +199,12 @@ namespace wavy::utils
             global_thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
                                                               global_invocation_id.z}] += 1;
 
-            co_await *winfo.barrier;
+            co_await std::suspend_always{};
 
             global_thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
                                                               global_invocation_id.z}] += 1;
 
-            co_await *winfo.barrier;
+            co_await std::suspend_always{};
 
             global_thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
                                                               global_invocation_id.z}] += 1;
@@ -301,21 +301,21 @@ namespace wavy::utils
             detail::cs_kernel_local_info local_info{winfo, global_invocation_id, local_invocation_id};
             test_helper::store_indices(local_invocation_index, local_info, *winfo.shared_memory);
 
-            co_await *winfo.barrier;
+            co_await std::suspend_always{};
 
             std::array<std::size_t, test_helper::cluster_size> indices_0;
             std::size_t sum =
                 test_helper::calc_cluster_sum(local_invocation_index, local_info, *winfo.shared_memory, indices_0);
 
-            co_await *winfo.barrier;
+            co_await std::suspend_always{};
 
             store_sum(local_invocation_index, winfo, indices_0, sum);
 
-            co_await *winfo.barrier;
+            co_await std::suspend_always{};
 
             check_all_sums(local_invocation_index, winfo);
 
-            co_await *winfo.barrier;
+            co_await std::suspend_always{};
 
             propagate_checks(local_invocation_index, winfo, count_correct);
         };

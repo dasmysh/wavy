@@ -24,7 +24,6 @@ namespace wavy::utils {
         glm::uvec3 num_work_groups;
         glm::uvec3 work_group_size;
         glm::uvec3 work_group_id;
-        std::shared_ptr<async_barrier> barrier;
         SharedMemoryType* shared_memory;
     };
 
@@ -70,8 +69,6 @@ namespace wavy::utils {
         std::mdspan kernel_awaitables(kernel_awaitables_linear.data(), winfo.work_group_size.x,
                                          winfo.work_group_size.y, winfo.work_group_size.z);
 
-        auto barrier = winfo.barrier;
-
         for (std::size_t liz = 0; liz < winfo.work_group_size.z; ++liz) {
             for (std::size_t liy = 0; liy < winfo.work_group_size.y; ++liy) {
                 for (std::size_t lix = 0; lix < winfo.work_group_size.x; ++lix) {
@@ -92,7 +89,9 @@ namespace wavy::utils {
 
         bool all_kernels_done = false;
         while (!all_kernels_done) {
-            for (auto& awaitable : awaitables_linear) { awaitable.resume(); }
+            for (auto& awaitable : awaitables_linear) {
+                if (!awaitable.is_ready()) { awaitable.resume(); }
+            }
 
             while (!scheduling_finished_barrier->is_ready()) { co_await scheduling_finished_barrier->scheduling(); }
 
@@ -109,10 +108,7 @@ namespace wavy::utils {
                 }
             }
 
-            assert(unfinished_work_groups == awaitables_linear.size() || unfinished_work_groups == 0);
-
-            barrier->reset();
-            scheduling_finished_barrier->reset();
+            scheduling_finished_barrier->reset(unfinished_work_groups);
         }
     }
 
@@ -121,13 +117,11 @@ namespace wavy::utils {
                                                                 const glm::uvec3& work_group_size, Pred kernel)
     {
         std::size_t work_groups_linear = work_groups.x * work_groups.y * work_groups.z;
-        std::size_t work_group_size_linear = work_group_size.x * work_group_size.y * work_group_size.z;
 
         coro::thread_pool work_groups_thread_pool(
             coro::thread_pool::options{.thread_count = static_cast<std::uint32_t>(work_groups_linear)});
         auto worker_thread_pool = std::make_shared<coro::thread_pool>();
 
-        std::vector<std::shared_ptr<async_barrier>> barriers_linear(work_groups_linear);
         shared_memory_container<SharedMemoryType> shared_memory(work_groups, work_groups_linear);
         std::vector<coro::task<>> awaitables_linear(work_groups_linear);
         std::vector<coro::task<>> work_group_awaitables_linear(work_groups_linear);
@@ -135,7 +129,6 @@ namespace wavy::utils {
         auto scheduling_finished_barrier =
             std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(work_groups_linear));
 
-        std::mdspan barriers(barriers_linear.data(), work_groups.x, work_groups.y, work_groups.z);
         std::mdspan awaitables(awaitables_linear.data(), work_groups.x, work_groups.y, work_groups.z);
         std::mdspan work_group_awaitables(work_group_awaitables_linear.data(), work_groups.x, work_groups.y,
                                              work_groups.z);
@@ -144,15 +137,10 @@ namespace wavy::utils {
             for (std::size_t wiy = 0; wiy < work_groups.y; ++wiy) {
                 for (std::size_t wix = 0; wix < work_groups.x; ++wix) {
                     glm::uvec3 work_group_id{wix, wiy, wiz};
-
-                    auto& barrier =
-                        barriers[std::array<std::size_t, 3>{work_group_id.x, work_group_id.y, work_group_id.z}];
-                    barrier = std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(work_group_size_linear));
                     work_group_info<SharedMemoryType> winfo{
                         .num_work_groups = work_groups,
                         .work_group_size = work_group_size,
                         .work_group_id = work_group_id,
-                        .barrier = barrier,
                         .shared_memory = shared_memory[work_group_id]
                     };
 
