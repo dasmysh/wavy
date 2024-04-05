@@ -67,7 +67,8 @@ namespace wavy::utils
             co_return;
         };
 
-        emulate_compute_shader(glm::uvec3{1}, glm::uvec3{1}, kernel);
+        compute_shader_emulator cs{glm::uvec3{1}};
+        cs.emulate_compute_shader(glm::uvec3{1}, kernel);
 
         CHECK(single_thread_executed == true);
     }
@@ -112,7 +113,8 @@ namespace wavy::utils
 
             atomic_all_invocation_indices_correct = true;
 
-            emulate_compute_shader(work_groups, work_group_size, simple_kernel);
+            compute_shader_emulator cs{work_groups};
+            cs.emulate_compute_shader(work_group_size, simple_kernel);
 
             bool all_invocation_indices_correct = atomic_all_invocation_indices_correct.load();
             CHECK(all_invocation_indices_correct == true);
@@ -210,7 +212,8 @@ namespace wavy::utils
                                                               global_invocation_id.z}] += 1;
         };
 
-        emulate_compute_shader(work_groups, work_group_size, kernel);
+        compute_shader_emulator cs{work_groups};
+        cs.emulate_compute_shader(work_group_size, kernel);
 
         for (const auto& executed : thread_executed_linear) { CHECK(executed == 3); }
     }
@@ -320,8 +323,8 @@ namespace wavy::utils
             propagate_checks(local_invocation_index, winfo, count_correct);
         };
 
-        emulate_compute_shader<test_helper::shared_memory>(test_helper::work_groups, test_helper::work_group_size,
-                                                           kernel);
+        compute_shader_emulator cs{test_helper::work_groups};
+        cs.emulate_compute_shader<test_helper::shared_memory>(test_helper::work_group_size, kernel);
 
         for (const auto& count_correct_work_group : count_correct_linear) { CHECK(count_correct_work_group == 1); }
     }

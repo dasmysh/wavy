@@ -115,11 +115,15 @@ namespace wavy::sph {
         };
 
         constexpr glm::uvec3 work_group_size{256, 1, 1};
-        const glm::uvec3 work_groups =
-            glm::uvec3{m_particle_histogram.size() + work_group_size.x - 1, 1, 1} / work_group_size;
 
-        utils::emulate_compute_shader<shared_memory>(
-            work_groups, work_group_size,
+        if (const glm::uvec3 work_groups =
+                glm::uvec3{m_particle_histogram.size() + work_group_size.x - 1, 1, 1} / work_group_size;
+            !m_cs || m_cs->get_work_groups() != work_groups) {
+            m_cs = std::make_unique<utils::compute_shader_emulator>(work_groups);
+        }
+
+        m_cs->emulate_compute_shader<shared_memory>(
+            work_group_size,
             [this, &global_cell_offset_count](utils::work_group_info<shared_memory> winfo,
                                               glm::uvec3 local_invocation_id, glm::uvec3 global_invocation_id,
                                               unsigned local_invocation_index) -> coro::task<> {

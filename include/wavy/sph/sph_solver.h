@@ -11,8 +11,14 @@
 #include <glm/vec2.hpp>
 #include <vector>
 #include <atomic>
+#include <memory>
 
 import sph;
+
+namespace wavy::utils
+{
+    class compute_shader_emulator;
+}
 
 namespace wavy::sph {
 
@@ -107,5 +113,6 @@ namespace wavy::sph {
         particle_pattern m_pattern;
 
         sph_config m_config;
+        std::unique_ptr<utils::compute_shader_emulator> m_cs;
     };
 }
