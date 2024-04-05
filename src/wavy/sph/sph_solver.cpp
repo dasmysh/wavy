@@ -9,6 +9,7 @@
 #include "main.h"
 #include "sph/sph_solver.h"
 #include "utils/enumerate.h"
+#include "utils/compute_shader_cpu_emulation.h"
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
@@ -105,54 +106,46 @@ namespace wavy::sph {
 
     void sph_solver::calculate_cell_offsets()
     {
-        constexpr std::size_t emulated_mp_count = 4;
         std::atomic_int global_cell_offset_count = 0;
-        std::vector<std::atomic_int> local_particle_count(emulated_mp_count);
-        std::vector<std::size_t> global_cell_offsets(emulated_mp_count);
 
-        std::vector<std::unique_ptr<std::barrier<>>> inits_done;
-        std::vector<std::size_t> barrier_sizes;
+        struct shared_memory
+        {
+            std::atomic_int local_particle_count = 0;
+            std::size_t global_cell_offset = 0;
+        };
 
-        auto threads_to_distribute = m_particle_histogram.size();
-        for (std::size_t i = 0; i < emulated_mp_count; ++i) {
-            auto mps_left = emulated_mp_count - i;
-            auto threads_on_mp = (threads_to_distribute + mps_left - 1) / mps_left;
-            inits_done.emplace_back(std::make_unique<std::barrier<>>(threads_on_mp));
-            barrier_sizes.emplace_back(threads_on_mp);
-            threads_to_distribute -= threads_on_mp;
-        }
+        constexpr glm::uvec3 work_group_size{256, 1, 1};
+        const glm::uvec3 work_groups =
+            glm::uvec3{m_particle_histogram.size() + work_group_size.x - 1, 1, 1} / work_group_size;
 
-        // TODO: there is a deadlock here.
-        // deadlock is due to a limited number of threads all waiting for the barrier but it will never be filled.
-        auto enumerate_cells = utils::enumerate(m_particle_histogram);
-        std::for_each(std::execution::par, std::begin(enumerate_cells), std::end(enumerate_cells),
-                      [this, &global_cell_offset_count, &local_particle_count, &global_cell_offsets,
-                       &inits_done](const auto& enumerated_cell_content_count) {
-                          auto global_index = std::get<0>(enumerated_cell_content_count);
-                          auto cell_content_count = std::get<1>(enumerated_cell_content_count).load();
-                          auto local_index = global_index / emulated_mp_count;
-                          auto emulated_mp_index = global_index % emulated_mp_count;
+        utils::emulate_compute_shader<shared_memory>(
+            work_groups, work_group_size,
+            [this, &global_cell_offset_count](utils::work_group_info<shared_memory> winfo,
+                                              glm::uvec3 local_invocation_id, glm::uvec3 global_invocation_id,
+                                              unsigned local_invocation_index) -> coro::task<> {
+                auto global_index = global_invocation_id.x;
+                if (global_index >= m_particle_histogram.size()) { co_return; }
+                auto cell_content_count = m_particle_histogram[global_index].load();
 
-                          if (local_index == 0) { local_particle_count[emulated_mp_index] = 0; }
+                if (local_invocation_index == 0) { winfo.shared_memory->local_particle_count = 0; }
 
-                          inits_done[emulated_mp_index]->arrive_and_wait();
+                co_await std::suspend_always{};
 
-                          auto local_particle_offset =
-                              local_particle_count[emulated_mp_index].fetch_add(cell_content_count);
+                auto local_particle_offset = winfo.shared_memory->local_particle_count.fetch_add(cell_content_count);
 
-                          inits_done[emulated_mp_index]->arrive_and_wait();
+                co_await std::suspend_always{};
 
-                          if (local_index == 0) {
-                              global_cell_offsets[emulated_mp_index] =
-                                  global_cell_offset_count.fetch_add(local_particle_count[emulated_mp_index].load());
-                          }
+                if (local_invocation_index == 0) {
+                    winfo.shared_memory->global_cell_offset =
+                        global_cell_offset_count.fetch_add(winfo.shared_memory->local_particle_count.load());
+                }
 
-                          inits_done[emulated_mp_index]->arrive_and_wait();
+                co_await std::suspend_always{};
 
-                          auto cell_offset = global_cell_offsets[emulated_mp_index] + local_particle_offset;
-                          m_cell_offsets[global_index] = cell_offset;
-                          m_particle_histogram[global_index] = 0;
-                      });
+                auto cell_offset = winfo.shared_memory->global_cell_offset + local_particle_offset;
+                m_cell_offsets[global_index] = cell_offset;
+                m_particle_histogram[global_index] = 0;
+            });
     }
 
     void sph_solver::sort_particles_into_cells()

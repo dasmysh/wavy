@@ -12,20 +12,11 @@
 #include "utils/enumerate.h"
 
 #include "imgui.h"
-#include "imgui_stdlib.h"
 #include <glm/common.hpp>
 #include <glm/geometric.hpp>
 #include <glm/gtx/norm.hpp>
 #include <numeric>
 #include <execution>
-
-template<> struct std::hash<glm::uvec2>
-{
-    std::size_t operator()(const glm::uvec2& k) const
-    {
-        return wavy::sph::sph_solver::grid_hash(k);
-    }
-};
 
 namespace wavy::sph {
 
@@ -49,22 +40,17 @@ namespace wavy::sph {
         if (delta_t > 1.5f * m_last_delta_t || delta_t < 0.5f * m_last_delta_t) { m_delta_t_out_of_bounds = true; }
         m_last_delta_t = glm::mix(m_last_delta_t, delta_t, .3f);
 
-        float delta_t_step = delta_t / static_cast<float>(m_sim_steps_per_frame);
-        for (int i = 0; i < m_sim_steps_per_frame; ++i) { m_solver->simulation_step(delta_t_step * m_sim_time_scale); }
+        float delta_t_step = delta_t / static_cast<float>(m_gui.get_sim_steps_per_frame());
+        for (int i = 0; i < m_gui.get_sim_steps_per_frame(); ++i) {
+            m_solver->simulation_step(delta_t_step * m_gui.get_sim_time_scale());
+        }
     }
 
-    void wavy::sph::sph::draw_gui()
+    void sph::draw_gui()
     {
-        if (ImGui::Begin("SPH")) {
-            if (ImGui::BeginTabBar("SPH#tabs_bar")) {
-                draw_settings_gui();
-                draw_particle_info_gui();
-                draw_cell_info_gui();
-                ImGui::EndTabBar();
-            }
+        m_gui.draw_gui(*m_solver);
 
-            ImGui::End();
-        }
+        if (m_gui.should_update_smoothing_kernels()) { update_smoothing_kernels(); }
     }
 
     void sph::draw_simulation(sf::RenderTarget& rt)
@@ -91,16 +77,20 @@ namespace wavy::sph {
 
         draw_grid(rt);
 
-        if (m_visualize_scalar != -1) {
-            if (m_show_scalar_field_texture) {
-                visualize_scalar_field(rt, static_cast<std::size_t>(m_visualize_scalar));
+        if (m_gui.get_visualize_scalar() != -1) {
+            if (m_gui.is_show_scalar_field_texture()) {
+                auto visualize_scalar = static_cast<std::size_t>(m_gui.get_visualize_scalar());
+                if (m_gui.should_update_scalar_field() || m_scalar_field_texture.getSize() != rt.getSize()) {
+                    update_scalar_field_texture(visualize_scalar);
+                }
+                visualize_scalar_field(rt);
             } else {
-                visualize_scalar_field_points(rt, static_cast<std::size_t>(m_visualize_scalar));
+                visualize_scalar_field_points(rt, static_cast<std::size_t>(m_gui.get_visualize_scalar()));
             }
         }
 
-        sf::CircleShape particleShape{m_visual_particle_radius};
-        particleShape.setOrigin(m_visual_particle_radius, m_visual_particle_radius);
+        sf::CircleShape particleShape{m_gui.get_visual_particle_radius()};
+        particleShape.setOrigin(m_gui.get_visual_particle_radius(), m_gui.get_visual_particle_radius());
         auto selectedParticleShape = particleShape;
         particleShape.setFillColor(sf::Color::Blue);
         selectedParticleShape.setOutlineThickness(1.f);
@@ -111,10 +101,10 @@ namespace wavy::sph {
             auto render_position = simulation_to_screen(particle.position);
             if (m_mouse_clicked
                 && glm::distance2(particle.position, m_mouse_pos_simulation)
-                       < m_visual_particle_radius * m_visual_particle_radius) {
-                m_selected_particle_index = index;
+                       < m_gui.get_visual_particle_radius() * m_gui.get_visual_particle_radius()) {
+                m_gui.select_particle(index);
             }
-            if (m_selected_particle_index == index) {
+            if (m_gui.get_selected_particle_index() == index) {
                 selectedParticleShape.setPosition(render_position.x, render_position.y);
                 rt.draw(selectedParticleShape);
             } else {
@@ -138,12 +128,12 @@ namespace wavy::sph {
                                            static_cast<float>(event.mouseButton.y)};
                 m_mouse_pos_simulation = screen_to_simulation(mouse_pos_screen);
                 m_mouse_clicked = true;
-                m_selected_particle_index = static_cast<std::size_t>(-1);
+                m_gui.reset_selected_particle();
             }
 
             if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Right) {
-                m_selected_particle_index = static_cast<std::size_t>(-1);
-                m_selected_cell_hash = static_cast<std::size_t>(-1);
+                m_gui.reset_selected_particle();
+                m_gui.reset_selected_cell();
             }
         }
     }
@@ -175,13 +165,8 @@ namespace wavy::sph {
         }
     }
 
-    void sph::visualize_scalar_field(sf::RenderTarget& rt, std::size_t i) const
+    void sph::visualize_scalar_field(sf::RenderTarget& rt) const
     {
-        if (m_update_scalar_field || m_scalar_field_texture.getSize() != rt.getSize()) {
-            update_scalar_field_texture(i);
-            m_update_scalar_field = false;
-        }
-
         sf::Sprite field_sprite;
         field_sprite.setTexture(m_scalar_field_texture);
         rt.draw(field_sprite);
@@ -242,7 +227,7 @@ namespace wavy::sph {
         for (int iy = start_cell.y; iy <= end_cell.y; ++iy) {
             for (int ix = start_cell.x; ix <= end_cell.x; ++ix) {
                 auto cell_hash = sph_solver::grid_hash(glm::ivec2{ix, iy});
-                if (m_selected_cell_hash == cell_hash) {
+                if (m_gui.get_selected_cell_hash() == cell_hash) {
                     glm::vec2 simulation_position{static_cast<float>(ix) * m_solver->get_config().get_particle_radius(),
                                                   static_cast<float>(iy)
                                                       * m_solver->get_config().get_particle_radius()};
@@ -344,292 +329,6 @@ namespace wavy::sph {
             c = sf::Color{0, 0, 255, v};
         }
         return c;
-    }
-
-    void sph::draw_settings_gui()
-    {
-        if (ImGui::BeginTabItem("Settings")) {
-            ImGui::SliderFloat("Visual Particle Radius", &m_visual_particle_radius, .001f, 100.f);
-            ImGui::SliderFloat("Simulation Time Scale", &m_sim_time_scale, .1f, 100000.f);
-            ImGui::InputInt("Simulation Steps per Frame", &m_sim_steps_per_frame);
-            m_sim_steps_per_frame = glm::max(1, m_sim_steps_per_frame);
-
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            draw_simulation_settings_gui();
-
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            draw_particle_settings_gui();
-
-
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            draw_physical_settings_gui();
-
-
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            draw_scalar_visualization_settings_gui();
-
-            ImGui::EndTabItem();
-        }
-    }
-
-    void sph::draw_simulation_settings_gui()
-    {
-        if (auto particle_count = static_cast<int>(m_solver->get_particles().size());
-            ImGui::InputInt("Particle Count", &particle_count)) {
-            m_solver->set_particle_count(static_cast<std::size_t>(particle_count));
-            m_update_scalar_field = true;
-            m_selected_particle_index = static_cast<std::size_t>(-1);
-        }
-
-        std::array<const char*, 2> pattern_names{"random", "centered_grid"};
-        if (auto current_pattern = static_cast<int>(m_solver->get_pattern());
-            ImGui::Combo("Pattern", &current_pattern, pattern_names.data(), static_cast<int>(pattern_names.size()))) {
-            m_solver->set_particle_pattern(static_cast<particle_pattern>(current_pattern));
-            m_update_scalar_field = true;
-            m_selected_particle_index = static_cast<std::size_t>(-1);
-        }
-
-        static int seed = 1337;
-        if (m_solver->get_pattern() == particle_pattern::random) { ImGui::InputInt("Seed", &seed, 0); }
-
-        if (ImGui::Button("Reset Particles")) {
-            m_solver->reset_particles(seed);
-            m_update_scalar_field = true;
-            m_selected_particle_index = static_cast<std::size_t>(-1);
-        }
-    }
-
-    void sph::draw_particle_settings_gui()
-    {
-        if (auto particle_radius = m_solver->get_config().get_particle_radius();
-            ImGui::SliderFloat("Particle Radius", &particle_radius, .1f, 500.f)) {
-            m_solver->get_config().set_particle_radius(particle_radius);
-            update_smoothing_kernels();
-            m_update_scalar_field = true;
-        }
-
-        if (auto particle_mass = m_solver->get_config().get_particle_mass();
-            ImGui::SliderFloat("Particle Mass", &particle_mass, .001f, 100.f)) {
-            m_solver->get_config().set_particle_mass(particle_mass);
-            m_update_scalar_field = true;
-        }
-    }
-
-    void sph::draw_physical_settings_gui()
-    {
-        if (auto gravity = m_solver->get_config().get_gravity(); ImGui::SliderFloat("Gravity", &gravity, .0f, 100.f)) {
-            m_solver->get_config().set_gravity(gravity);
-        }
-
-        if (auto collision_dampening = m_solver->get_config().get_collision_dampening();
-            ImGui::SliderFloat("Collision Dampening", &collision_dampening, .0f, 1.f)) {
-            m_solver->get_config().set_collision_dampening(collision_dampening);
-        }
-
-        if (auto target_density = m_solver->get_config().get_target_density();
-            ImGui::SliderFloat("Target Density", &target_density, .001f, 10.f)) {
-            m_solver->get_config().set_target_density(target_density);
-        }
-
-        if (auto pressure_multiplier = m_solver->get_config().get_pressure_multiplier();
-            ImGui::SliderFloat("Pressure Multiplier", &pressure_multiplier, .1f, 10.f)) {
-            m_solver->get_config().set_pressure_multiplier(pressure_multiplier);
-        }
-    }
-
-    void sph::draw_scalar_visualization_settings_gui()
-    {
-        if (bool visualize_scalar = m_visualize_scalar != -1;
-            ImGui::Checkbox("Visualize Density Field", &visualize_scalar)) {
-            m_visualize_scalar = visualize_scalar ? 0 : -1;
-        }
-
-        if (m_visualize_scalar != -1) {
-            ImGui::Checkbox("As Field", &m_show_scalar_field_texture);
-            m_update_scalar_field |= ImGui::RadioButton("Density", &m_visualize_scalar, 0);
-            m_update_scalar_field |= ImGui::RadioButton("Dummy Property", &m_visualize_scalar, 1);
-        }
-    }
-
-    void sph::draw_particle_info_gui()
-    {
-        if (ImGui::BeginTabItem("Particle Info")) {
-            if (ImGui::BeginTable("particle_props", 6,
-                                  ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY
-                                      | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoSavedSettings)) {
-                ImGui::TableSetupColumn("Position", ImGuiTableColumnFlags_WidthFixed, 160);
-                ImGui::TableSetupColumn("Velocity", ImGuiTableColumnFlags_WidthFixed, 120);
-                ImGui::TableSetupColumn("Density", ImGuiTableColumnFlags_WidthFixed, 90);
-                ImGui::TableSetupColumn("Property", ImGuiTableColumnFlags_WidthFixed, 90);
-                ImGui::TableSetupColumn("Grid Cell", ImGuiTableColumnFlags_WidthFixed, 85);
-                ImGui::TableSetupColumn("Grid Index", ImGuiTableColumnFlags_WidthFixed, 70);
-                ImGui::TableSetupScrollFreeze(0, 1);
-                ImGui::TableHeadersRow();
-
-                for (const auto& [index, particle] : utils::enumerate(m_solver->get_particles())) {
-                    draw_particle_info_table_rows(index, particle);
-                }
-                ImGui::EndTable();
-            }
-            ImGui::EndTabItem();
-        }
-    }
-
-    void sph::draw_particle_info_table_rows(std::size_t index, const sph_solver::particle& particle)
-    {
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        if (ImGui::Selectable(fmt::format("({:.2f}, {:.2f})", particle.position.x, particle.position.y).c_str(),
-                              index == m_selected_particle_index,
-                              ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
-            m_selected_particle_index = index;
-        }
-        ImGui::TableNextColumn();
-        ImGui::Text("(%.2f, %.2f)", particle.velocity.x, particle.velocity.y);
-        ImGui::TableNextColumn();
-        ImGui::Text("%.4f", particle.density);
-        ImGui::TableNextColumn();
-        ImGui::Text("%.4f", particle.property);
-        ImGui::TableNextColumn();
-        auto grid_cell = m_solver->grid_cell(particle.position);
-        ImGui::Text("[%u, %u]", grid_cell.x, grid_cell.y);
-        ImGui::TableNextColumn();
-        ImGui::Text("%zu", particle.grid_index);
-    }
-
-    void sph::draw_cell_info_gui()
-    {
-        if (ImGui::BeginTabItem("Cell Info")) {
-            if (ImGui::BeginTable("cell_props", 8,
-                                  ImGuiTableFlags_Resizable | ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY
-                                      | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoSavedSettings)) {
-                ImGui::TableSetupColumn("Grid Index", ImGuiTableColumnFlags_WidthFixed, 70);
-                ImGui::TableSetupColumn("Particle Count", ImGuiTableColumnFlags_WidthFixed, 100);
-                ImGui::TableSetupColumn("Grid Cells", ImGuiTableColumnFlags_WidthFixed, 70);
-                ImGui::TableSetupColumn("Particle", ImGuiTableColumnFlags_WidthFixed, 65);
-                ImGui::TableSetupColumn("-Position", ImGuiTableColumnFlags_WidthFixed, 135);
-                ImGui::TableSetupColumn("-Velocity", ImGuiTableColumnFlags_WidthFixed, 135);
-                ImGui::TableSetupColumn("-Density", ImGuiTableColumnFlags_WidthFixed, 65);
-                ImGui::TableSetupColumn("-Property", ImGuiTableColumnFlags_WidthFixed, 65);
-                ImGui::TableSetupScrollFreeze(0, 1);
-                ImGui::TableHeadersRow();
-
-                for (const auto& [index, cell] : utils::enumerate(m_solver->get_cell_sizes())) {
-                    draw_cell_info_table_rows(index, static_cast<std::size_t>(cell.load()));
-                }
-                ImGui::EndTable();
-            }
-            ImGui::EndTabItem();
-        }
-    }
-
-    void sph::draw_cell_info_table_rows(std::size_t index, std::size_t cell_size)
-    {
-        auto cell_offset = m_solver->get_cell_offsets()[index];
-        auto cell_end = cell_offset + cell_size;
-
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        ImGui::Text("%zu", index);
-        ImGui::TableNextColumn();
-        bool list_cells = false;
-        if (cell_size != 0) {
-            list_cells = ImGui::TreeNodeEx(fmt::format("{}: {}-{}###cnt{}", cell_size, cell_offset, cell_end, index).c_str(),
-                                           ImGuiTreeNodeFlags_SpanFullWidth);
-        } else {
-            ImGui::Text("%zu: %zu-%zu", cell_size, cell_offset, cell_end, index);
-        }
-
-        ImGui::TableNextColumn();
-        ImGui::TableNextColumn();
-        ImGui::TableNextColumn();
-        ImGui::TableNextColumn();
-        ImGui::TableNextColumn();
-        ImGui::TableNextColumn();
-
-        if (list_cells) {
-            draw_cell_info_table_list_cells(cell_offset, cell_end);
-            ImGui::TreePop();
-        }
-    }
-
-    void sph::draw_cell_info_table_list_cells(std::size_t cell_offset, std::size_t cell_end)
-    {
-        std::unordered_map<glm::uvec2, std::vector<std::size_t>> grid_cell_to_particle_indices;
-        for (std::size_t particle_index_i = cell_offset; particle_index_i < cell_end; ++particle_index_i) {
-            auto particle_index = m_solver->get_particle_indices()[particle_index_i];
-            const auto& particle = m_solver->get_particles()[particle_index];
-            grid_cell_to_particle_indices[m_solver->grid_cell(particle.position)].push_back(particle_index);
-        }
-        for (const auto& [cell, cell_particle_indices] : grid_cell_to_particle_indices) {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::TableNextColumn();
-            ImGui::TableNextColumn();
-            if (auto cell_hash = sph_solver::grid_hash(cell);
-                ImGui::Selectable(fmt::format("[{}, {}]", cell.x, cell.y).c_str(), cell_hash == m_selected_cell_hash,
-                                  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
-                m_selected_cell_hash = cell_hash;
-            }
-            ImGui::TableNextColumn();
-            bool list_particles = false;
-            if (!cell_particle_indices.empty()) {
-                list_particles = ImGui::TreeNodeEx(fmt::format("#: {}", cell_particle_indices.size()).c_str(),
-                                                   ImGuiTreeNodeFlags_SpanFullWidth);
-            } else {
-                ImGui::Text("#: %zu", cell_particle_indices.size());
-            }
-            ImGui::TableNextColumn();
-            ImGui::TableNextColumn();
-            ImGui::TableNextColumn();
-            ImGui::TableNextColumn();
-
-            if (list_particles) {
-                draw_cell_info_table_list_particles(cell_particle_indices);
-                ImGui::TreePop();
-            }
-        }
-    }
-
-    void sph::draw_cell_info_table_list_particles(const std::vector<std::size_t>& cell_particle_indices)
-    {
-        for (const auto& particle_index : cell_particle_indices) {
-            const auto& particle = m_solver->get_particles()[particle_index];
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::TableNextColumn();
-            ImGui::TableNextColumn();
-            ImGui::TableNextColumn();
-            ImGui::TreeNodeEx(fmt::format("{}", particle_index).c_str(),
-                              ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_Bullet | ImGuiTreeNodeFlags_NoTreePushOnOpen
-                                  | ImGuiTreeNodeFlags_SpanFullWidth);
-            ImGui::SameLine();
-            if (ImGui::Selectable(fmt::format("##{}", particle_index).c_str(),
-                                  particle_index == m_selected_particle_index,
-                                  ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowOverlap)) {
-                m_selected_particle_index = particle_index;
-            }
-            ImGui::TableNextColumn();
-            ImGui::Text("(%.2f, %.2f)", particle.position.x, particle.position.y);
-            ImGui::TableNextColumn();
-            ImGui::Text("(%.2f, %.2f)", particle.velocity.x, particle.velocity.y);
-            ImGui::TableNextColumn();
-            ImGui::Text("%.4f", particle.density);
-            ImGui::TableNextColumn();
-            ImGui::Text("%.4f", particle.property);
-        }
     }
 
     glm::vec2 sph::screen_to_simulation(const glm::vec2& screen_pos) const

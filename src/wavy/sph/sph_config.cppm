@@ -1,5 +1,5 @@
 /**
- * @file   sph_config.cxx
+ * @file   sph_config.cppm
  * @author Sebastian Maisch <sebastian.maisch@googlemail.com>
  * @date   2024.03.06
  *
@@ -8,7 +8,7 @@
 
 module;
 
-export module sph;
+export module sph:config;
 
 namespace wavy::sph
 {

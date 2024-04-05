@@ -8,9 +8,11 @@
 
 #pragma once
 
-import sph;
-
 #include <glm/vec2.hpp>
+#include <vector>
+#include <atomic>
+
+import sph;
 
 namespace wavy::sph {
 
