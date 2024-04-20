@@ -65,15 +65,19 @@ namespace wavy::utils {
         template<class SharedMemoryType, typename Pred>
         coro::task<> emulate_compute_shader_schedule_work_groups(const glm::uvec3& work_group_size, Pred kernel);
         template<class SharedMemoryType, typename Pred>
-        coro::task<> schedule_emulated_compute_shader_work_group(std::shared_ptr<coro::thread_pool> worker_thread_pool,
-                                                                 work_group_info<SharedMemoryType> winfo, Pred kernel);
+        coro::task<> schedule_emulated_compute_shader_work_group(work_group_info<SharedMemoryType> winfo, Pred kernel);
+
+        coro::task<> resume_on_worker_thread_pool(std::shared_ptr<async_barrier> scheduling_finsied_barrier,
+                                                  coro::task<>& kernel);
+        coro::task<> resume_on_work_groups_thread_pool(std::shared_ptr<async_barrier> scheduling_finsied_barrier,
+                                                       coro::task<>& kernel);
         coro::task<> resume_on_thread_pool(coro::thread_pool& tp,
                                            std::shared_ptr<async_barrier> scheduling_finsied_barrier,
                                            coro::task<>& kernel) const;
 
         glm::uvec3 m_work_groups;
         coro::thread_pool m_work_groups_thread_pool;
-        std::shared_ptr<coro::thread_pool> m_worker_thread_pool = std::make_shared<coro::thread_pool>();
+        coro::thread_pool m_worker_thread_pool;
     };
 
     template<class SharedMemoryType, typename Pred>
@@ -117,10 +121,8 @@ namespace wavy::utils {
                     auto& awaitable = awaitables[std::array<std::size_t, 3>{{wix, wiy, wiz}}];
                     auto& work_group_awaitable = work_group_awaitables[std::array<std::size_t, 3>{wix, wiy, wiz}];
 
-                    work_group_awaitable =
-                        schedule_emulated_compute_shader_work_group(m_worker_thread_pool, winfo, kernel);
-                    awaitable = resume_on_thread_pool(m_work_groups_thread_pool, scheduling_finished_barrier,
-                                                      work_group_awaitable);
+                    work_group_awaitable = schedule_emulated_compute_shader_work_group(winfo, kernel);
+                    awaitable = resume_on_work_groups_thread_pool(scheduling_finished_barrier, work_group_awaitable);
                 }
             }
         }
@@ -140,8 +142,7 @@ namespace wavy::utils {
                 auto& work_group_awaitable = work_group_awaitables_linear[i];
                 if (!work_group_awaitable.is_ready()) {
                     all_work_groups_done = false;
-                    awaitable = resume_on_thread_pool(m_work_groups_thread_pool, scheduling_finished_barrier,
-                                                      work_group_awaitable);
+                    awaitable = resume_on_work_groups_thread_pool(scheduling_finished_barrier, work_group_awaitable);
                     unfinished_work_groups += 1;
                 }
             }
@@ -151,8 +152,9 @@ namespace wavy::utils {
     }
 
     template<class SharedMemoryType, typename Pred>
-    coro::task<> compute_shader_emulator::schedule_emulated_compute_shader_work_group(
-        std::shared_ptr<coro::thread_pool> worker_thread_pool, work_group_info<SharedMemoryType> winfo, Pred kernel)
+    coro::task<>
+    compute_shader_emulator::schedule_emulated_compute_shader_work_group(work_group_info<SharedMemoryType> winfo,
+                                                                         Pred kernel)
     {
         std::size_t work_group_size_linear =
             winfo.work_group_size.x * winfo.work_group_size.y * winfo.work_group_size.z;
@@ -179,7 +181,7 @@ namespace wavy::utils {
                     auto& kernel_awaitable = kernel_awaitables[std::array<std::size_t, 3>{lix, liy, liz}];
                     kernel_awaitable = kernel(winfo, local_invocation_id, global_invocation_id, local_invocation_index);
                     awaitable =
-                        resume_on_thread_pool(*worker_thread_pool, scheduling_finished_barrier, kernel_awaitable);
+                        resume_on_worker_thread_pool(scheduling_finished_barrier, kernel_awaitable);
                 }
             }
         }
@@ -200,7 +202,7 @@ namespace wavy::utils {
                 if (!kernel_awaitable.is_ready()) {
                     all_kernels_done = false;
                     awaitable =
-                        resume_on_thread_pool(*worker_thread_pool, scheduling_finished_barrier, kernel_awaitable);
+                        resume_on_worker_thread_pool(scheduling_finished_barrier, kernel_awaitable);
                     unfinished_work_groups += 1;
                 }
             }
