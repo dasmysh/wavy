@@ -304,9 +304,10 @@ namespace wavy::sph {
 
     float sph_solver::density_kernel(float r) const
     {
-        auto volume = glm::pi<float>() * glm::pow(m_config.get_particle_radius(), 8.f) / 4.f;
-        auto value = glm::max(0.f, m_config.get_particle_radius() * m_config.get_particle_radius() - r * r);
-        return value * value * value / volume;
+        if (r >= m_config.get_particle_radius()) { return 0.f; }
+        auto volume = glm::pi<float>() * glm::pow(m_config.get_particle_radius(), 4.f) / 6.f;
+        auto value = m_config.get_particle_radius() - r;
+        return (value * value) / volume;
     }
 
     float sph_solver::pressure_kernel(float r) const
@@ -314,7 +315,7 @@ namespace wavy::sph {
         if (r >= m_config.get_particle_radius()) { return 0.f; }
         auto volume = glm::pi<float>() * glm::pow(m_config.get_particle_radius(), 4.f) / 6.f;
         auto value = m_config.get_particle_radius() - r;
-        return value * value / volume;
+        return (value * value) / volume;
     }
 
     float sph_solver::pressure_kernel_derivative(float r) const
