@@ -11,3 +11,7 @@ module;
 export module wavy.sphui;
 
 export import :gui;
+export import :visualization;
+export import :conversions;
+export import :input;
+export import :timer;

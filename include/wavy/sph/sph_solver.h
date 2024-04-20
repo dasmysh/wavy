@@ -31,8 +31,7 @@ namespace wavy::sph {
     class sph_solver
     {
     public:
-
-        explicit sph_solver(const glm::vec2& simulation_area, std::size_t initial_particle_count = 100,
+        explicit sph_solver(const glm::vec2& simulation_area, std::size_t initial_particle_count = 500,
                             particle_pattern pattern = particle_pattern::random);
         ~sph_solver();
 
