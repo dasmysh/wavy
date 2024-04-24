@@ -62,7 +62,7 @@ namespace wavy::utils
         bool single_thread_executed = false;
         auto kernel = [&single_thread_executed](work_group_info<void> winfo, glm::uvec3 local_invocation_id,
                                                 glm::uvec3 global_invocation_id,
-                                                unsigned local_invocation_index) -> coro::task<> {
+                                                unsigned local_invocation_index) -> utils::task<> {
             single_thread_executed = true;
             co_return;
         };
@@ -78,7 +78,7 @@ namespace wavy::utils
     public:
         cs_test_fixture()
             : simple_kernel{[this](work_group_info<void> winfo, glm::uvec3 local_invocation_id,
-                                   glm::uvec3 global_invocation_id, unsigned local_invocation_index) -> coro::task<> {
+                                   glm::uvec3 global_invocation_id, unsigned local_invocation_index) -> utils::task<> {
                 detail::cs_kernel_local_info local_info{winfo, global_invocation_id, local_invocation_id};
 
                 THREADSAVE_CHECK_EQ(atomic_all_invocation_indices_correct, local_info.global_invocation_index,
@@ -136,7 +136,7 @@ namespace wavy::utils
         std::mdspan<std::atomic_size_t, std::dextents<std::size_t, 3>> local_thread_counts_id;
         std::vector<std::atomic_size_t> local_thread_counts_index;
         std::atomic_bool atomic_all_invocation_indices_correct = true;
-        std::function<coro::task<>(work_group_info<void>, glm::uvec3, glm::uvec3, unsigned)> simple_kernel;
+        std::function<utils::task<>(work_group_info<void>, glm::uvec3, glm::uvec3, unsigned)> simple_kernel;
     };
 
     TEST_CASE_METHOD(cs_test_fixture, "wavy::utils::emulate_compute_shader.multiple threads in one workgroup 1D", "")
@@ -197,7 +197,7 @@ namespace wavy::utils
 
         auto kernel = [&global_thread_executed](work_group_info<void> winfo, glm::uvec3 local_invocation_id,
                                                 glm::uvec3 global_invocation_id,
-                                                unsigned local_invocation_index) -> coro::task<> {
+                                                unsigned local_invocation_index) -> utils::task<> {
             global_thread_executed[std::array<std::size_t, 3>{global_invocation_id.x, global_invocation_id.y,
                                                               global_invocation_id.z}] += 1;
 
@@ -300,7 +300,7 @@ namespace wavy::utils
 
         auto kernel = [&count_correct](test_helper::work_group_info winfo, glm::uvec3 local_invocation_id,
                                        glm::uvec3 global_invocation_id,
-                                       unsigned local_invocation_index) -> coro::task<> {
+                                       unsigned local_invocation_index) -> utils::task<> {
             detail::cs_kernel_local_info local_info{winfo, global_invocation_id, local_invocation_id};
             test_helper::store_indices(local_invocation_index, local_info, *winfo.shared_memory);
 

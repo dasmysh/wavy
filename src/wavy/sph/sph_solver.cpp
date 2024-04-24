@@ -126,7 +126,7 @@ namespace wavy::sph {
             work_group_size,
             [this, &global_cell_offset_count](utils::work_group_info<shared_memory> winfo,
                                               glm::uvec3 local_invocation_id, glm::uvec3 global_invocation_id,
-                                              unsigned local_invocation_index) -> coro::task<> {
+                                              unsigned local_invocation_index) -> utils::task<> {
                 auto global_index = global_invocation_id.x;
                 if (global_index >= m_particle_histogram.size()) { co_return; }
                 auto cell_content_count = m_particle_histogram[global_index].load();
