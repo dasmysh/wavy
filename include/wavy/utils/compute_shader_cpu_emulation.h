@@ -9,6 +9,7 @@
 #pragma once
 
 #include "utils/async_barrier.h"
+#include "utils/synced_task.h"
 #include "utils/task.h"
 
 #include <coro/sync_wait.hpp>
@@ -70,18 +71,16 @@ namespace wavy::utils {
         template<class SharedMemoryType, typename Pred>
         task<> schedule_emulated_compute_shader_work_group(work_group_info<SharedMemoryType> winfo, Pred kernel);
 
-        task<> resume_on_worker_thread_pool(std::shared_ptr<async_barrier> scheduling_finsied_barrier, task<>& kernel);
-        task<> resume_on_work_groups_thread_pool(std::shared_ptr<async_barrier> scheduling_finsied_barrier,
-                                                 task<>& kernel);
-        task<> resume_on_thread_pool(coro::thread_pool& tp, std::shared_ptr<async_barrier> scheduling_finsied_barrier,
-                                     task<>& kernel) const;
+        synced_task<> resume_on_worker_thread_pool(task<>& kernel);
+        synced_task<> resume_on_work_groups_thread_pool(task<>& kernel);
+        task<> resume_on_thread_pool(coro::thread_pool& tp, task<>& kernel) const;
 
         glm::uvec3 m_work_groups;
         std::size_t m_work_groups_linear;
         coro::thread_pool m_work_groups_thread_pool;
         coro::thread_pool m_worker_thread_pool;
 
-        std::vector<task<>> m_awaitables_linear;
+        std::vector<synced_task<>> m_awaitables_linear;
         std::vector<task<>> m_work_group_awaitables_linear;
     };
 
@@ -122,7 +121,7 @@ namespace wavy::utils {
                     auto& work_group_awaitable = work_group_awaitables[std::array<std::size_t, 3>{wix, wiy, wiz}];
 
                     work_group_awaitable = schedule_emulated_compute_shader_work_group(winfo, kernel);
-                    awaitable = resume_on_work_groups_thread_pool(scheduling_finished_barrier, work_group_awaitable);
+                    awaitable = resume_on_work_groups_thread_pool(work_group_awaitable);
                 }
             }
         }
@@ -130,7 +129,7 @@ namespace wavy::utils {
         bool all_work_groups_done = false;
         while (!all_work_groups_done) {
             for (auto& awaitable : m_awaitables_linear) {
-                if (!awaitable.is_ready()) { awaitable.resume(); }
+                if (!awaitable.is_ready()) { awaitable.start(*scheduling_finished_barrier); }
             }
 
             while (!scheduling_finished_barrier->is_ready()) { co_await scheduling_finished_barrier->scheduling(); }
@@ -142,7 +141,7 @@ namespace wavy::utils {
                 auto& work_group_awaitable = m_work_group_awaitables_linear[i];
                 if (!work_group_awaitable.is_ready()) {
                     all_work_groups_done = false;
-                    awaitable = resume_on_work_groups_thread_pool(scheduling_finished_barrier, work_group_awaitable);
+                    awaitable = resume_on_work_groups_thread_pool(work_group_awaitable);
                     unfinished_work_groups += 1;
                 }
             }
@@ -157,7 +156,7 @@ namespace wavy::utils {
     {
         std::size_t work_group_size_linear =
             winfo.work_group_size.x * winfo.work_group_size.y * winfo.work_group_size.z;
-        std::vector<task<>> awaitables_linear(work_group_size_linear);
+        std::vector<synced_task<>> awaitables_linear(work_group_size_linear);
         std::vector<task<>> kernel_awaitables_linear(work_group_size_linear);
         auto scheduling_finished_barrier =
             std::make_shared<async_barrier>(static_cast<std::ptrdiff_t>(work_group_size_linear));
@@ -179,7 +178,7 @@ namespace wavy::utils {
                     auto& awaitable = awaitables[std::array<std::size_t, 3>{lix, liy, liz}];
                     auto& kernel_awaitable = kernel_awaitables[std::array<std::size_t, 3>{lix, liy, liz}];
                     kernel_awaitable = kernel(winfo, local_invocation_id, global_invocation_id, local_invocation_index);
-                    awaitable = resume_on_worker_thread_pool(scheduling_finished_barrier, kernel_awaitable);
+                    awaitable = resume_on_worker_thread_pool(kernel_awaitable);
                 }
             }
         }
@@ -187,7 +186,7 @@ namespace wavy::utils {
         bool all_kernels_done = false;
         while (!all_kernels_done) {
             for (auto& awaitable : awaitables_linear) {
-                if (!awaitable.is_ready()) { awaitable.resume(); }
+                if (!awaitable.is_ready()) { awaitable.start(*scheduling_finished_barrier); }
             }
 
             while (!scheduling_finished_barrier->is_ready()) { co_await scheduling_finished_barrier->scheduling(); }
@@ -199,7 +198,7 @@ namespace wavy::utils {
                 auto& kernel_awaitable = kernel_awaitables_linear[i];
                 if (!kernel_awaitable.is_ready()) {
                     all_kernels_done = false;
-                    awaitable = resume_on_worker_thread_pool(scheduling_finished_barrier, kernel_awaitable);
+                    awaitable = resume_on_worker_thread_pool(kernel_awaitable);
                     unfinished_work_groups += 1;
                 }
             }
