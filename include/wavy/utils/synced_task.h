@@ -208,6 +208,7 @@ namespace wavy::utils {
         synced_task(coroutine_type coroutine) noexcept
             : m_coroutine(coroutine)
         {
+            spdlog::info("+synced_task {}", m_coroutine.address());
         }
 
         synced_task(const synced_task&) = delete;
@@ -225,6 +226,7 @@ namespace wavy::utils {
 
         ~synced_task()
         {
+            spdlog::info("-synced_task {}", m_coroutine.address());
             if (m_coroutine) { m_coroutine.destroy(); }
         }
 

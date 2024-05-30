@@ -148,6 +148,11 @@ namespace wavy::utils {
 
             scheduling_finished_barrier->reset(unfinished_work_groups);
         }
+
+        for (auto& awaitable : m_awaitables_linear)
+        {
+            awaitable = synced_task{};
+        }
     }
 
     template<class SharedMemoryType, typename Pred>
@@ -204,6 +209,11 @@ namespace wavy::utils {
             }
 
             scheduling_finished_barrier->reset(unfinished_work_groups);
+        }
+
+        for (auto& awaitable : awaitables_linear)
+        {
+            awaitable = synced_task{};
         }
     }
 }
