@@ -9,6 +9,7 @@
 #pragma once
 
 #include "async_barrier.h"
+#include "app_constants.h"
 
 #include <coroutine>
 #include <variant>
@@ -174,7 +175,7 @@ namespace wavy::utils {
 
             auto get_return_object() noexcept { return coroutine_type::from_promise(*this); }
 
-            auto final_suspend() noexcept
+            auto final_suspend() const noexcept
             {
                 struct completion_notifier
                 {
@@ -183,7 +184,7 @@ namespace wavy::utils {
                     {
                         coroutine.promise().get_barrier().count_down();
                     }
-                    auto await_resume() noexcept {};
+                    auto await_resume() const noexcept {};
                 };
 
                 return completion_notifier{};
@@ -208,7 +209,7 @@ namespace wavy::utils {
         synced_task(coroutine_type coroutine) noexcept
             : m_coroutine(coroutine)
         {
-            spdlog::info("+synced_task {}", m_coroutine.address());
+            if constexpr (verbose_logging) { spdlog::info("+synced_task {}", m_coroutine.address()); }
         }
 
         synced_task(const synced_task&) = delete;
@@ -219,14 +220,14 @@ namespace wavy::utils {
         auto operator=(const synced_task&) -> synced_task& = delete;
         auto operator=(synced_task&& other) noexcept -> synced_task&
         {
-            if (std::addressof(other) != this) { m_coroutine = std::exchange(other.m_coroutine, coroutine_type{}); }
+            if (std::addressof(other) != this) { m_coroutine = std::exchange(other.m_coroutine, m_coroutine); }
 
             return *this;
         }
 
         ~synced_task()
         {
-            spdlog::info("-synced_task {}", m_coroutine.address());
+            if constexpr (verbose_logging) { spdlog::info("-synced_task {}", m_coroutine.address()); }
             if (m_coroutine) { m_coroutine.destroy(); }
         }
 

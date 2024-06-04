@@ -34,6 +34,8 @@ namespace wavy
     constexpr bool debug_build = true;
 #endif
 
+    constexpr bool verbose_logging = false;
+
     enum class InterpolationMethod
     {
         Linear, Cubic

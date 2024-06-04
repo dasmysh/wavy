@@ -12,7 +12,6 @@
 #include "utils/synced_task.h"
 #include "utils/task.h"
 
-#include <coro/sync_wait.hpp>
 #include <coro/thread_pool.hpp>
 #include <glm/vec3.hpp>
 #include <mdspan>
