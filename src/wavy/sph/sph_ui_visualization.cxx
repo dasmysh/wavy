@@ -77,8 +77,8 @@ namespace wavy::sph {
              const auto& [index, particle] : utils::enumerate(particles)) {
             auto render_position = conversions.simulation_to_screen(particle.position);
             if (input.is_mouse_clicked()
-                && glm::distance2(particle.position, input.get_mouse_pos_simulation())
-                       < gui.get_visual_particle_radius() * gui.get_visual_particle_radius()) {
+                && glm::distance2(render_position, input.get_mouse_pos_screen())
+                       < 4.f * gui.get_visual_particle_radius() * gui.get_visual_particle_radius()) {
                 gui.select_particle(index);
             }
             if (gui.get_selected_particle_index() == index) {

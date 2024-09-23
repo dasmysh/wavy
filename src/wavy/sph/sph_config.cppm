@@ -8,6 +8,8 @@
 
 module;
 
+#include <glm/gtc/constants.hpp>
+
 export module sph:config;
 
 namespace wavy::sph
@@ -36,11 +38,12 @@ namespace wavy::sph
     private:
         struct initial_values
         {
-            static constexpr auto particle_radius = 20.f;
+            static constexpr auto particle_radius = .35f;
             static constexpr auto particle_mass = 1.f;
-            static constexpr auto target_density = 2.75f;
-            static constexpr auto pressure_multiplier = .5f;
-            static constexpr auto gravity = 0.f; // 9.81f;
+            static constexpr auto target_density = 5.2f;
+                // (6.f * particle_mass) / (glm::pi<float>() * particle_radius * particle_radius);
+            static constexpr auto pressure_multiplier = 27.44f;
+            static constexpr auto gravity = 9.81f;
             static constexpr auto collision_dampening = .1f;
         };
 

@@ -59,7 +59,7 @@
     },
     {
         "name": "sanitizers-ninja-multi",
-        "displayName": "Default Config with Sanitizers",
+        "displayName": "Ninja Multi-Config with Sanitizers",
         "description": "Default build using Ninja Multi-Config generator and Sanitizers",
         "generator": "Ninja Multi-Config",
         "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",

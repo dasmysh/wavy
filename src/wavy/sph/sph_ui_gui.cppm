@@ -52,8 +52,8 @@ namespace wavy::sph {
                                                  const std::vector<std::size_t>& cell_particle_indices);
 
         float m_visual_particle_radius = 5.f;
-        float m_sim_time_scale = 10.f;
-        int m_sim_steps_per_frame = 10;
+        float m_sim_time_scale = 0.1f;
+        int m_sim_steps_per_frame = 2;
 
         std::size_t m_selected_particle_index = static_cast<std::size_t>(-1);
         std::size_t m_selected_cell_hash = static_cast<std::size_t>(-1);

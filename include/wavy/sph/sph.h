@@ -40,5 +40,7 @@ namespace wavy::sph {
         sph_visualization m_visualization;
         sph_input m_input;
         sph_timer m_timer;
+
+        bool m_pause_simulation = false;
     };
 }

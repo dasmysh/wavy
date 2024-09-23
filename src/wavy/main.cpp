@@ -141,7 +141,8 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
     ImGui::SFML::Init(window);
 
     spdlog::debug("Starting main loop.");
-    wavy::sph::sph sph_manager{glm::vec2{ 1920.0f, 1080.0f }};
+    // wavy::sph::sph sph_manager{glm::vec2{1920.0f, 1080.0f}};
+    wavy::sph::sph sph_manager{glm::vec2{16.f, 9.f}};
 
     sf::Clock delta_clock;
     sf::Clock poll_clock;

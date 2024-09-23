@@ -31,7 +31,9 @@ namespace wavy::sph {
 
     void sph::simulation_frame(float delta_t)
     {
-        m_timer.update_time(*m_solver, m_gui, delta_t);
+        if (!m_pause_simulation || m_input.is_space_pressed()) {
+            m_timer.update_time(*m_solver, m_gui, delta_t);
+        }
     }
 
     void sph::draw_gui()
@@ -39,6 +41,8 @@ namespace wavy::sph {
         m_gui.draw_gui(*m_solver);
 
         if (m_gui.should_update_smoothing_kernels()) { m_visualization.update_smoothing_kernels(*m_solver); }
+
+        m_input.reset_state();
     }
 
     void sph::draw_simulation(sf::RenderTarget& rt)
@@ -49,6 +53,14 @@ namespace wavy::sph {
     void sph::process_event(const sf::Event& event)
     {
         m_input.process_event(m_conversions, m_gui, event);
+
+        if (!m_pause_simulation && m_input.is_space_pressed()) {
+            m_pause_simulation = true;
+        }
+
+        if (m_pause_simulation && m_input.is_space_double_pressed()) {
+            m_pause_simulation = false;
+        }
     }
 
 }

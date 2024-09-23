@@ -77,7 +77,7 @@ namespace wavy::sph {
             });
         } else if (m_pattern == particle_pattern::centered_grid) {
             auto grid_width = glm::ceil(glm::sqrt(static_cast<float>(m_particles.size())));
-            auto pos_offset = .5f * (m_simulation_area - grid_width * m_config.get_particle_radius());
+            auto pos_offset = .5f * (m_simulation_area - grid_width * 0.2f * m_config.get_particle_radius());
 
             std::ranges::for_each(utils::enumerate(m_particles), [this, grid_width, &pos_offset](auto enum_particle) {
                 auto i = static_cast<float>(std::get<0>(enum_particle));
@@ -85,7 +85,7 @@ namespace wavy::sph {
                 auto y = glm::floor((static_cast<float>(m_particles.size() - 1) - i) / grid_width) + .5f;
 
                 auto& prtcl = std::get<1>(enum_particle);
-                prtcl = particle{pos_offset + glm::vec2{x, y} * m_config.get_particle_radius()};
+                prtcl = particle{pos_offset + glm::vec2{x, y} * 0.2f * m_config.get_particle_radius()};
                 prtcl.property = calc_property(prtcl.position);
             });
         }
@@ -168,7 +168,9 @@ namespace wavy::sph {
     void sph_solver::update_densities()
     {
         std::for_each(std::execution::par, std::begin(m_particles), std::end(m_particles),
-                      [this](auto& particle) { particle.density = calculate_density(particle.position_predicted); });
+                      [this](auto& particle) {
+                particle.density = calculate_density(particle.position_predicted);
+            });
     }
 
     void sph_solver::apply_pressure(float delta_t)
@@ -321,7 +323,7 @@ namespace wavy::sph {
     float sph_solver::pressure_kernel_derivative(float r) const
     {
         if (r >= m_config.get_particle_radius()) { return 0.f; }
-        auto scale = -12.f / (glm::pi<float>() * glm::pow(m_config.get_particle_radius(), 4.f));
+        auto scale = 12.f / (glm::pi<float>() * glm::pow(m_config.get_particle_radius(), 4.f));
         auto value = m_config.get_particle_radius() - r;
         return value * scale;
     }
@@ -378,7 +380,7 @@ namespace wavy::sph {
         auto slope = pressure_kernel_derivative(r);
         auto density = m_particles[particle_1_index].density;
         auto shared_pressure = calculate_shared_pressure(m_particles[particle_0_index].density, density);
-        return shared_pressure * dir * slope * m_config.get_particle_mass() / density;
+        return -shared_pressure * dir * slope * m_config.get_particle_mass() / density;
     }
 
     glm::vec2 sph_solver::calculate_pressure_force_internal(const glm::vec2& center_position,

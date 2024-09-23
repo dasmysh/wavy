@@ -47,7 +47,7 @@ function(set_project_options project_name)
 
   if (MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.14)
     set(LINKER_OPTIONS "")
-    set(PROJECT_OPTIONS ${MSVC_VECTOR_OPTIMIZATIONS} /external:W0 /external:anglebrackets /analyze:external-)
+    set(PROJECT_OPTIONS ${MSVC_VECTOR_OPTIMIZATIONS} /external:W0 /external:anglebrackets /analyze:external- /experimental:module)
     if (MSVC AND !${NAMESPACE}_ENABLE_ADDRESS_SANITIZER)
       set(LINKER_OPTIONS ${LINKER_OPTIONS} /INCREMENTAL)
       set(PROJECT_OPTIONS ${PROJECT_OPTIONS} $<$<CONFIG:Debug>:/ZI>)
