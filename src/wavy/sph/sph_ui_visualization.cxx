@@ -73,18 +73,47 @@ namespace wavy::sph {
         selectedParticleShape.setOutlineColor(sf::Color::Red);
         selectedParticleShape.setFillColor(sf::Color::Blue);
 
+        const glm::vec3 colorTarget{.0f, 1.f, .0f};
+        const glm::vec3 colorLow{.0f, .5f, 1.f};
+        const glm::vec3 colorHigh{1.f, .5f, .0f};
         for (const auto& particles = solver.get_particles();
              const auto& [index, particle] : utils::enumerate(particles)) {
             auto render_position = conversions.simulation_to_screen(particle.position);
+            auto density = particle.density - solver.get_config().get_target_density();
+            glm::vec3 particleColor;
+            if (density < 0) {
+                if (density < -solver.get_config().get_target_density()) {
+                    density = 1.f;
+                } else {
+                    density = density / -solver.get_config().get_target_density();
+                }
+
+                particleColor = colorTarget * (1.f - density) + colorLow * density;
+            } else {
+                if (density > solver.get_config().get_target_density()) {
+                    density = 1.f;
+                } else {
+                    density = density / solver.get_config().get_target_density();
+                }
+
+                particleColor = colorTarget * (1.f - density) + colorHigh * density;
+            }
+
             if (input.is_mouse_clicked()
                 && glm::distance2(render_position, input.get_mouse_pos_screen())
                        < 4.f * gui.get_visual_particle_radius() * gui.get_visual_particle_radius()) {
                 gui.select_particle(index);
             }
             if (gui.get_selected_particle_index() == index) {
+                selectedParticleShape.setFillColor(sf::Color{static_cast<uint8_t>(particleColor.r * 255.f),
+                                                             static_cast<uint8_t>(particleColor.g * 255.f),
+                                                             static_cast<uint8_t>(particleColor.b * 255.f)});
                 selectedParticleShape.setPosition(render_position.x, render_position.y);
                 rt.draw(selectedParticleShape);
             } else {
+                particleShape.setFillColor(sf::Color{static_cast<uint8_t>(particleColor.r * 255.f),
+                                                             static_cast<uint8_t>(particleColor.g * 255.f),
+                                                             static_cast<uint8_t>(particleColor.b * 255.f)});
                 particleShape.setPosition(render_position.x, render_position.y);
                 rt.draw(particleShape);
             }
