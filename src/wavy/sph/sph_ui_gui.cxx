@@ -168,6 +168,8 @@ namespace wavy::sph {
             ImGui::SliderFloat("Pressure Multiplier", &pressure_multiplier, .1f, 10.f)) {
             solver.get_config().set_pressure_multiplier(pressure_multiplier);
         }
+
+        ImGui::SliderFloat("External Influence", &m_ext_influence_strength, 100.f, 100000.f);
     }
 
     void sph_gui::draw_scalar_visualization_settings_gui()

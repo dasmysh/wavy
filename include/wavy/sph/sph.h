@@ -42,5 +42,8 @@ namespace wavy::sph {
         sph_timer m_timer;
 
         bool m_pause_simulation = false;
+        constexpr static float DEFAULT_INFLUENCE_RADIUS = .5f;
+
+        sph_solver::external_influence m_ext_influence;
     };
 }

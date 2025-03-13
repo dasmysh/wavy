@@ -35,11 +35,11 @@ namespace wavy::sph {
 
     sph_solver::~sph_solver() = default;
 
-    void sph_solver::simulation_step(float delta_t)
+    void sph_solver::simulation_step(float delta_t, const external_influence* ext_influence)
     {
         std::for_each(std::execution::par, std::begin(m_particle_histogram), std::end(m_particle_histogram),
                       [](auto& v) { v = 0; });
-        simulate_gravity_and_predict_positions(delta_t);
+        simulate_gravity_and_predict_positions(delta_t, ext_influence);
 
         calculate_cell_offsets();
         sort_particles_into_cells();
@@ -91,12 +91,29 @@ namespace wavy::sph {
         }
     }
 
-    void sph_solver::simulate_gravity_and_predict_positions(float delta_t)
+    void sph_solver::simulate_gravity_and_predict_positions(float delta_t, const external_influence* ext_influence)
     {
         float delta_gravity = m_config.get_gravity() * delta_t;
+        m_current_ext_influence = ext_influence;
         std::for_each(std::execution::par, std::begin(m_particles), std::end(m_particles),
                       [this, delta_gravity, delta_t](auto& particle) {
                           particle.velocity += glm::vec2{0.f, -1.f} * delta_gravity;
+                          if (m_current_ext_influence && m_current_ext_influence->strength != 0.f) {
+                              auto to_influence_center = m_current_ext_influence->position - particle.position;
+                              auto distance_to_influence = glm::length(to_influence_center);
+                              if (distance_to_influence < m_current_ext_influence->radius) {
+
+                                  float radius_factor = 1.f - (m_current_ext_influence->radius - distance_to_influence)
+                                                        / m_current_ext_influence->radius;
+                                  radius_factor *= radius_factor;
+                                  radius_factor *= radius_factor;
+                                  radius_factor = 1.f - radius_factor;
+
+                                  // add mouse influence
+                                  particle.velocity +=
+                                      to_influence_center * radius_factor * m_current_ext_influence->strength * delta_t;
+                              }
+                          }
                           particle.position_predicted = particle.position + particle.velocity * delta_t;
 
                           particle.grid_index = grid_hash(grid_cell(particle.position_predicted)) % m_particles.size();

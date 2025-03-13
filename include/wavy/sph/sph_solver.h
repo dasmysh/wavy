@@ -51,7 +51,14 @@ namespace wavy::sph {
             std::size_t grid_index = static_cast<std::size_t>(-1);
         };
 
-        void simulation_step(float delta_t);
+        struct external_influence
+        {
+            glm::vec2 position = glm::vec2{0.f};
+            float radius = 0.f;
+            float strength = 0.f;
+        };
+
+        void simulation_step(float delta_t, const external_influence* ext_influence);
 
         void set_particle_count(std::size_t particle_count);
         void set_particle_pattern(particle_pattern pattern);
@@ -78,8 +85,10 @@ namespace wavy::sph {
         glm::ivec2 grid_cell(const glm::vec2& p) const;
         static std::size_t grid_hash(const glm::ivec2& cell);
 
+        auto get_current_external_influence() const { return m_current_ext_influence; }
+
     private:
-        void simulate_gravity_and_predict_positions(float delta_t);
+        void simulate_gravity_and_predict_positions(float delta_t, const external_influence* ext_influence);
         void calculate_cell_offsets();
         void sort_particles_into_cells();
         void update_densities();
@@ -113,5 +122,7 @@ namespace wavy::sph {
 
         sph_config m_config;
         std::unique_ptr<utils::compute_shader_emulator> m_cs;
+
+        const external_influence* m_current_ext_influence;
     };
 }

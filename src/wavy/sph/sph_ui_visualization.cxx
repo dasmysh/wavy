@@ -90,6 +90,19 @@ namespace wavy::sph {
             }
         }
 
+        // draw external influence
+        if (auto ext_influence = solver.get_current_external_influence(); ext_influence) {
+            auto render_position = conversions.simulation_to_screen(ext_influence->position);
+            auto render_origin = conversions.simulation_to_render_area(glm::vec2{ext_influence->radius});
+            sf::CircleShape extInfluenceShape{render_origin.x};
+            extInfluenceShape.setOrigin(render_origin.x, render_origin.x);
+            extInfluenceShape.setPosition(render_position.x, render_position.y);
+            extInfluenceShape.setOutlineThickness(1.f);
+            extInfluenceShape.setOutlineColor(sf::Color::Red);
+            extInfluenceShape.setFillColor(sf::Color::Transparent);
+            rt.draw(extInfluenceShape);
+        }
+
         sf::Text delta_t_text(fmt::format("{:.3f}", timer.get_delta_t()), m_delta_t_font);
         delta_t_text.setFillColor(timer.is_delta_t_out_of_bounds() ? sf::Color::Red : sf::Color::Green);
         delta_t_text.setOutlineColor(timer.is_delta_t_out_of_bounds() ? sf::Color::Red : sf::Color::Green);

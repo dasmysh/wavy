@@ -35,6 +35,7 @@ namespace wavy::sph {
         bool should_update_scalar_field();
         int get_visualize_scalar() const { return m_visualize_scalar; }
         bool is_show_scalar_field_texture() const { return m_show_scalar_field_texture; }
+        float get_ext_influence_strength() const { return m_ext_influence_strength; }
 
     private:
         void draw_settings_gui(sph_solver& solver);
@@ -54,6 +55,7 @@ namespace wavy::sph {
         float m_visual_particle_radius = 5.f;
         float m_sim_time_scale = 0.1f;
         int m_sim_steps_per_frame = 2;
+        float m_ext_influence_strength = 1000.f;
 
         std::size_t m_selected_particle_index = static_cast<std::size_t>(-1);
         std::size_t m_selected_cell_hash = static_cast<std::size_t>(-1);

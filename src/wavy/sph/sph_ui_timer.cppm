@@ -17,7 +17,8 @@ namespace wavy::sph {
     public:
         sph_timer() = default;
 
-        void update_time(sph_solver& solver, sph_gui& gui, float delta_t);
+        void update_time(sph_solver& solver, sph_gui& gui, float delta_t,
+                         const sph_solver::external_influence* ext_influence);
 
         float get_delta_t() const { return m_last_delta_t; }
         bool is_delta_t_out_of_bounds() const { return m_delta_t_out_of_bounds; }

@@ -31,9 +31,15 @@ namespace wavy::sph {
         bool is_space_pressed() const { return m_space_pressed; }
         bool is_space_double_pressed() const { return m_space_double_pressed; }
 
+        bool is_p_down() const { return m_p_down; }
+        float get_mouse_wheel_delta() const { return m_mouse_wheel_delta; }
+        bool is_mouse_left_down() const { return m_mouse_left_down; }
+        bool is_mouse_right_down() const { return m_mouse_right_down; }
+
         void reset_state();
 
     private:
+        void set_mouse_position(sph_conversions& conversions, int x, int y);
         struct double_press_timer
         {
             std::chrono::system_clock::time_point time;
@@ -49,5 +55,10 @@ namespace wavy::sph {
         bool m_space_pressed = false;
         bool m_space_double_pressed = false;
         double_press_timer m_space_double_timer;
+
+        bool m_p_down = false;
+        float m_mouse_wheel_delta = 0.f;
+        bool m_mouse_left_down = false;
+        bool m_mouse_right_down = false;
     };
 }

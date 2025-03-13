@@ -25,14 +25,25 @@ namespace wavy::sph {
         , m_conversions{sim_area}
         , m_visualization{*m_solver}
     {
+        m_ext_influence.radius = DEFAULT_INFLUENCE_RADIUS;
     }
 
     sph::~sph() = default;
 
     void sph::simulation_frame(float delta_t)
     {
+        m_ext_influence.strength = 0.f;
         if (!m_pause_simulation || m_input.is_space_pressed()) {
-            m_timer.update_time(*m_solver, m_gui, delta_t);
+            m_ext_influence.position = m_input.get_mouse_pos_simulation();
+
+            if (m_input.is_p_down() && m_input.is_mouse_left_down()) {
+                m_ext_influence.strength = 1.f * m_gui.get_ext_influence_strength();
+            }
+            if (m_input.is_p_down() && m_input.is_mouse_right_down()) {
+                m_ext_influence.strength = -1.f * m_gui.get_ext_influence_strength();
+            }
+
+            m_timer.update_time(*m_solver, m_gui, delta_t, m_input.is_p_down() ? &m_ext_influence : nullptr);
         }
     }
 
@@ -60,6 +71,12 @@ namespace wavy::sph {
 
         if (m_pause_simulation && m_input.is_space_double_pressed()) {
             m_pause_simulation = false;
+        }
+
+        if (m_input.is_p_down()) {
+            m_ext_influence.radius += m_input.get_mouse_wheel_delta();
+        } else {
+            m_ext_influence.radius = DEFAULT_INFLUENCE_RADIUS;
         }
     }
 
