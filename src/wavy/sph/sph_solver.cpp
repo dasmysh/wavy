@@ -321,27 +321,41 @@ namespace wavy::sph {
             });
     }
 
-    float sph_solver::density_kernel(float r) const
+    constexpr float kernel_support = .2f;
+
+    float scale_to_support(float r, const sph_config& config)
     {
-        if (r >= m_config.get_particle_radius()) { return 0.f; }
-        auto volume = glm::pi<float>() * glm::pow(m_config.get_particle_radius(), 4.f) / 6.f;
-        auto value = m_config.get_particle_radius() - r;
+        return (r / config.get_particle_radius()) * kernel_support;
+    }
+
+    float sph_solver::density_kernel(float dst) const
+    {
+        // static const auto factor = 15.f / (glm::two_pi<float>() * glm::pow(kernel_support, 5.f));
+
+        if (dst >= m_config.get_particle_radius()) { return 0.f; }
+        auto volume = glm::pi<float>() * glm::pow(kernel_support, 4.f) / 6.f;
+        auto value = kernel_support - scale_to_support(dst, m_config);
+        return (value * value) / volume;
+
+
+        // auto volume = glm::pi<float>() * glm::pow(m_config.get_particle_radius(), 8.f) / 4.f;
+        // auto value = glm::max(0.f, m_config.get_particle_radius() * m_config.get_particle_radius() - r * r);
+        // return value * value * value / volume;
+    }
+
+    float sph_solver::pressure_kernel(float dst) const
+    {
+        if (dst >= m_config.get_particle_radius()) { return 0.f; }
+        auto volume = glm::pi<float>() * glm::pow(kernel_support, 4.f) / 6.f;
+        auto value = kernel_support - scale_to_support(dst, m_config);
         return (value * value) / volume;
     }
 
-    float sph_solver::pressure_kernel(float r) const
+    float sph_solver::pressure_kernel_derivative(float dst) const
     {
-        if (r >= m_config.get_particle_radius()) { return 0.f; }
-        auto volume = glm::pi<float>() * glm::pow(m_config.get_particle_radius(), 4.f) / 6.f;
-        auto value = m_config.get_particle_radius() - r;
-        return (value * value) / volume;
-    }
-
-    float sph_solver::pressure_kernel_derivative(float r) const
-    {
-        if (r >= m_config.get_particle_radius()) { return 0.f; }
-        auto scale = 12.f / (glm::pi<float>() * glm::pow(m_config.get_particle_radius(), 4.f));
-        auto value = m_config.get_particle_radius() - r;
+        if (dst >= m_config.get_particle_radius()) { return 0.f; }
+        auto scale = 12.f / (glm::pi<float>() * glm::pow(kernel_support, 4.f));
+        auto value = kernel_support - scale_to_support(dst, m_config);
         return value * scale;
     }
 
