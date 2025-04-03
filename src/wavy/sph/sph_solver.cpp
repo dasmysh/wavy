@@ -331,32 +331,30 @@ namespace wavy::sph {
     float sph_solver::density_kernel(float dst) const
     {
         // static const auto factor = 15.f / (glm::two_pi<float>() * glm::pow(kernel_support, 5.f));
+        static const auto factor = 6.f / (glm::pi<float>() * glm::pow(kernel_support, 4.f));
 
         if (dst >= m_config.get_particle_radius()) { return 0.f; }
-        auto volume = glm::pi<float>() * glm::pow(kernel_support, 4.f) / 6.f;
         auto value = kernel_support - scale_to_support(dst, m_config);
-        return (value * value) / volume;
-
-
-        // auto volume = glm::pi<float>() * glm::pow(m_config.get_particle_radius(), 8.f) / 4.f;
-        // auto value = glm::max(0.f, m_config.get_particle_radius() * m_config.get_particle_radius() - r * r);
-        // return value * value * value / volume;
+        return (value * value) * factor;
     }
 
     float sph_solver::pressure_kernel(float dst) const
     {
+        static const auto factor = 6.f / (glm::pi<float>() * glm::pow(kernel_support, 4.f));
+
         if (dst >= m_config.get_particle_radius()) { return 0.f; }
-        auto volume = glm::pi<float>() * glm::pow(kernel_support, 4.f) / 6.f;
         auto value = kernel_support - scale_to_support(dst, m_config);
-        return (value * value) / volume;
+        return (value * value) * factor;
     }
 
     float sph_solver::pressure_kernel_derivative(float dst) const
     {
+        // static const auto factor = 15.f / (glm::pi<float>() * glm::pow(kernel_support, 5.f));
+        static const auto factor = 12.f / (glm::pi<float>() * glm::pow(kernel_support, 4.f));
+
         if (dst >= m_config.get_particle_radius()) { return 0.f; }
-        auto scale = 12.f / (glm::pi<float>() * glm::pow(kernel_support, 4.f));
         auto value = kernel_support - scale_to_support(dst, m_config);
-        return value * scale;
+        return -value * factor;
     }
 
     float sph_solver::density_to_pressure(float density) const
@@ -399,7 +397,7 @@ namespace wavy::sph {
         dir = r == 0.f ? glm::circularRand(1.f) : dir / r;
         auto slope = pressure_kernel_derivative(r);
         auto density = m_particles[particle_1_index].density;
-        return -m_particles[particle_1_index].property * dir * slope * m_config.get_particle_mass() / density;
+        return m_particles[particle_1_index].property * dir * slope * m_config.get_particle_mass() / density;
     }
 
     glm::vec2 sph_solver::calculate_pressure_force_internal(std::size_t particle_0_index,
@@ -411,7 +409,7 @@ namespace wavy::sph {
         auto slope = pressure_kernel_derivative(r);
         auto density = m_particles[particle_1_index].density;
         auto shared_pressure = calculate_shared_pressure(m_particles[particle_0_index].density, density);
-        return -shared_pressure * dir * slope * m_config.get_particle_mass() / density;
+        return shared_pressure * dir * slope * m_config.get_particle_mass() / density;
     }
 
     glm::vec2 sph_solver::calculate_pressure_force_internal(const glm::vec2& center_position,
@@ -422,7 +420,7 @@ namespace wavy::sph {
         dir = r == 0.f ? glm::circularRand(1.f) : dir / r;
         auto slope = pressure_kernel_derivative(r);
         auto density = m_particles[particle_1_index].density;
-        return -density_to_pressure(density) * dir * slope * m_config.get_particle_mass() / density;
+        return density_to_pressure(density) * dir * slope * m_config.get_particle_mass() / density;
     }
 
 }

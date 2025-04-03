@@ -96,7 +96,8 @@ namespace wavy::sph {
         void update_positions_and_resolve_collisions(float delta_t);
 
         template<typename Ret, typename Pred>
-        Ret accumulate_over_neighbourhood(const glm::vec2& center_position, const Ret& start_value, Pred predicate) const;
+        Ret accumulate_over_neighbourhood(const glm::vec2& center_position, const Ret& start_value,
+                                          Pred predicate) const;
         float calculate_property(std::size_t particle_index) const;
         glm::vec2 calculate_property_gradient(std::size_t particle_index) const;
         glm::vec2 calculate_pressure_force(std::size_t particle_index) const;
