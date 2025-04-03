@@ -23,7 +23,7 @@ namespace wavy::sph {
     sph_visualization::sph_visualization(sph_solver& solver)
     {
         if (auto font_file = "../assets/monaspace/MonaspaceNeonVarVF[wght,wdth,slnt].ttf";
-            !m_delta_t_font.loadFromFile(font_file)) {
+            !m_delta_t_font.openFromFile(font_file)) {
             spdlog::error("Could not load font: {}", font_file);
         }
 
@@ -39,11 +39,11 @@ namespace wavy::sph {
         sf::RectangleShape line_top{sf::Vector2f(conversions.get_screen_size().x, border_thickness.y)};
         line_top.setFillColor(sf::Color::White);
         auto line_bottom = line_top;
-        line_bottom.setPosition(0.0f, border_thickness.y + conversions.get_render_size().y);
+        line_bottom.setPosition({0.0f, border_thickness.y + conversions.get_render_size().y});
         sf::RectangleShape line_left{sf::Vector2f(border_thickness.x, conversions.get_screen_size().y)};
         line_left.setFillColor(sf::Color::White);
         auto line_right = line_left;
-        line_right.setPosition(border_thickness.x + conversions.get_render_size().x, 0.0f);
+        line_right.setPosition({border_thickness.x + conversions.get_render_size().x, 0.0f});
 
         rt.draw(line_top);
         rt.draw(line_bottom);
@@ -66,7 +66,7 @@ namespace wavy::sph {
         }
 
         sf::CircleShape particleShape{gui.get_visual_particle_radius()};
-        particleShape.setOrigin(gui.get_visual_particle_radius(), gui.get_visual_particle_radius());
+        particleShape.setOrigin({gui.get_visual_particle_radius(), gui.get_visual_particle_radius()});
         auto selectedParticleShape = particleShape;
         particleShape.setFillColor(sf::Color::Blue);
         selectedParticleShape.setOutlineThickness(1.f);
@@ -108,13 +108,13 @@ namespace wavy::sph {
                 selectedParticleShape.setFillColor(sf::Color{static_cast<uint8_t>(particleColor.r * 255.f),
                                                              static_cast<uint8_t>(particleColor.g * 255.f),
                                                              static_cast<uint8_t>(particleColor.b * 255.f)});
-                selectedParticleShape.setPosition(render_position.x, render_position.y);
+                selectedParticleShape.setPosition({render_position.x, render_position.y});
                 rt.draw(selectedParticleShape);
             } else {
                 particleShape.setFillColor(sf::Color{static_cast<uint8_t>(particleColor.r * 255.f),
                                                              static_cast<uint8_t>(particleColor.g * 255.f),
                                                              static_cast<uint8_t>(particleColor.b * 255.f)});
-                particleShape.setPosition(render_position.x, render_position.y);
+                particleShape.setPosition({render_position.x, render_position.y});
                 rt.draw(particleShape);
             }
         }
@@ -124,15 +124,15 @@ namespace wavy::sph {
             auto render_position = conversions.simulation_to_screen(ext_influence->position);
             auto render_origin = conversions.simulation_to_render_area(glm::vec2{ext_influence->radius});
             sf::CircleShape extInfluenceShape{render_origin.x};
-            extInfluenceShape.setOrigin(render_origin.x, render_origin.x);
-            extInfluenceShape.setPosition(render_position.x, render_position.y);
+            extInfluenceShape.setOrigin({render_origin.x, render_origin.x});
+            extInfluenceShape.setPosition({render_position.x, render_position.y});
             extInfluenceShape.setOutlineThickness(1.f);
             extInfluenceShape.setOutlineColor(sf::Color::Red);
             extInfluenceShape.setFillColor(sf::Color::Transparent);
             rt.draw(extInfluenceShape);
         }
 
-        sf::Text delta_t_text(fmt::format("{:.3f}", timer.get_delta_t()), m_delta_t_font);
+        sf::Text delta_t_text(m_delta_t_font, fmt::format("{:.3f}", timer.get_delta_t()));
         delta_t_text.setFillColor(timer.is_delta_t_out_of_bounds() ? sf::Color::Red : sf::Color::Green);
         delta_t_text.setOutlineColor(timer.is_delta_t_out_of_bounds() ? sf::Color::Red : sf::Color::Green);
         rt.draw(delta_t_text);
@@ -145,21 +145,21 @@ namespace wavy::sph {
 
         auto radius = glm::ceil(solver.get_config().get_particle_radius());
 
-        sf::Sprite kernel_sprite;
-        kernel_sprite.setTexture(m_smoothing_kernels[i]);
-        kernel_sprite.setOrigin(radius, radius);
+        sf::Sprite kernel_sprite{m_smoothing_kernels[i]};
+        kernel_sprite.setOrigin({radius, radius});
         kernel_sprite.setColor(sf::Color::Blue);
 
-        sf::BlendMode accumulate_blending{sf::BlendMode::SrcAlpha, sf::BlendMode::One, sf::BlendMode::Add};
+        sf::BlendMode accumulate_blending{sf::BlendMode::Factor::SrcAlpha, sf::BlendMode::Factor::One,
+                                          sf::BlendMode::Equation::Add};
 
         for (const auto& particles = solver.get_particles(); const auto& particle : particles) {
             auto render_position = conversions.simulation_to_screen(particle.position);
-            kernel_sprite.setPosition(render_position.x, render_position.y);
-            sf::Uint8 v = 255;
+            kernel_sprite.setPosition({render_position.x, render_position.y});
+            std::uint8_t v = 255;
             if (i == 1) {
                 float property = particle.property;
                 float scaled_prop = 512.f * (.5f * property + .5f);
-                v = static_cast<sf::Uint8>(glm::clamp(scaled_prop, 0.f, 255.f));
+                v = static_cast<std::uint8_t>(glm::clamp(scaled_prop, 0.f, 255.f));
             }
             kernel_sprite.setColor(sf::Color{v, v, v, v} * sf::Color::Blue);
             rt.draw(kernel_sprite, accumulate_blending);
@@ -168,8 +168,7 @@ namespace wavy::sph {
 
     void sph_visualization::visualize_scalar_field(sf::RenderTarget& rt) const
     {
-        sf::Sprite field_sprite;
-        field_sprite.setTexture(m_scalar_field_texture);
+        sf::Sprite field_sprite{m_scalar_field_texture};
         rt.draw(field_sprite);
     }
 
@@ -183,12 +182,12 @@ namespace wavy::sph {
         sf::Color line_color{150, 150, 150, 100};
 
         sf::RectangleShape line_horizontal{sf::Vector2f{conversions.get_render_size().x, line_thickness}};
-        line_horizontal.setOrigin(-conversions.render_area_to_screen(glm::vec2{0.f}).x, .5f * line_thickness);
+        line_horizontal.setOrigin({-conversions.render_area_to_screen(glm::vec2{0.f}).x, .5f * line_thickness});
         line_horizontal.setOutlineColor(line_color);
         line_horizontal.setFillColor(line_color);
 
         sf::RectangleShape line_vertical{sf::Vector2f{line_thickness, conversions.get_render_size().y}};
-        line_vertical.setOrigin(.5f * line_thickness, -conversions.render_area_to_screen(glm::vec2{0.f}).y);
+        line_vertical.setOrigin({.5f * line_thickness, -conversions.render_area_to_screen(glm::vec2{0.f}).y});
         line_vertical.setOutlineColor(line_color);
         line_vertical.setFillColor(line_color);
 
@@ -198,14 +197,14 @@ namespace wavy::sph {
 
         float y_line = line_start.y;
         while (y_line > line_end.y) {
-            line_horizontal.setPosition(0.f, y_line);
+            line_horizontal.setPosition({0.f, y_line});
             rt.draw(line_horizontal);
             y_line -= grid_size.y;
         }
 
         float x_line = line_start.x;
         while (x_line < line_end.x) {
-            line_vertical.setPosition(x_line, 0.f);
+            line_vertical.setPosition({x_line, 0.f});
             rt.draw(line_vertical);
             x_line += grid_size.x;
         }
@@ -215,12 +214,12 @@ namespace wavy::sph {
         selected_cell_highlight.setOutlineColor(sf::Color::Red);
         selected_cell_highlight.setOutlineThickness(line_thickness);
         selected_cell_highlight.setFillColor(sf::Color::Transparent);
-        selected_cell_highlight.setOrigin(-line_thickness, grid_size.y - line_thickness);
+        selected_cell_highlight.setOrigin({-line_thickness, grid_size.y - line_thickness});
 
         auto screen_view = rt.getView();
         auto render_area_view = screen_view;
-        render_area_view.setSize(conversions.get_render_size().x, conversions.get_render_size().y);
-        render_area_view.setViewport(sf::FloatRect{.05f, .05f, .9f, .9f});
+        render_area_view.setSize({conversions.get_render_size().x, conversions.get_render_size().y});
+        render_area_view.setViewport(sf::FloatRect{{.05f, .05f}, {.9f, .9f}});
         rt.setView(render_area_view);
 
         auto start_cell = solver.grid_cell(glm::vec2{0.f});
@@ -234,7 +233,7 @@ namespace wavy::sph {
                                                   static_cast<float>(iy)
                                                       * solver.get_config().get_particle_radius()};
                     auto screen_position = conversions.simulation_to_screen(simulation_position);
-                    selected_cell_highlight.setPosition(screen_position.x, screen_position.y);
+                    selected_cell_highlight.setPosition({screen_position.x, screen_position.y});
                     rt.draw(selected_cell_highlight);
                 }
             }
@@ -246,9 +245,8 @@ namespace wavy::sph {
     void sph_visualization::update_scalar_field_texture(sph_solver& solver, sph_conversions& conversions,
                                                         std::size_t i) const
     {
-        sf::Image scalar_field_image;
-        scalar_field_image.create(static_cast<unsigned int>(conversions.get_screen_size().x),
-                                  static_cast<unsigned int>(conversions.get_screen_size().y));
+        sf::Image scalar_field_image{sf::Vector2u{static_cast<unsigned int>(conversions.get_screen_size().x),
+                                                  static_cast<unsigned int>(conversions.get_screen_size().y)}};
 
         if (m_screen_ys.size() != static_cast<std::size_t>(conversions.get_screen_size().y)) {
             m_screen_ys.resize(static_cast<std::size_t>(conversions.get_screen_size().y));
@@ -266,12 +264,13 @@ namespace wavy::sph {
                               auto simulation_position = conversions.screen_to_simulation(p);
 
                               auto c = calculate_scalar_color_at(solver, conversions, simulation_position, i, scale);
-                              scalar_field_image.setPixel(ix, iy, c);
+                              scalar_field_image.setPixel({ix, iy}, c);
                           }
                       });
 
-        m_scalar_field_texture.setSrgb(false);
-        m_scalar_field_texture.loadFromImage(scalar_field_image);
+        if (!m_scalar_field_texture.loadFromImage(scalar_field_image, false)) {
+            spdlog::error("Could not load scalar field texture from image.");
+        }
         m_scalar_field_texture.setSmooth(true);
     }
 
@@ -285,8 +284,7 @@ namespace wavy::sph {
     {
         auto& kernel = m_smoothing_kernels[i];
 
-        sf::Image kernel_image;
-        kernel_image.create(2 * radius, 2 * radius);
+        sf::Image kernel_image{sf::Vector2u{2 * radius, 2 * radius}};
 
         float scale = 0.f;
         if (i == 0) { scale = .2f / solver.density_kernel(0.f); }
@@ -302,16 +300,18 @@ namespace wavy::sph {
                 if (i == 0) { value = solver.density_kernel(r) * scale; }
                 if (i == 1) { value = solver.pressure_kernel(r) * scale; }
 
-                auto v = static_cast<sf::Uint8>(value * 255.f);
+                auto v = static_cast<std::uint8_t>(value * 255.f);
                 auto c = sf::Color(255, 255, 255, v);
-                kernel_image.setPixel(ix, iy, c);
-                kernel_image.setPixel(2 * radius - ix - 1, iy, c);
-                kernel_image.setPixel(ix, 2 * radius - iy - 1, c);
-                kernel_image.setPixel(2 * radius - ix - 1, 2 * radius - iy - 1, c);
+                kernel_image.setPixel({ix, iy}, c);
+                kernel_image.setPixel({2 * radius - ix - 1, iy}, c);
+                kernel_image.setPixel({ix, 2 * radius - iy - 1}, c);
+                kernel_image.setPixel({2 * radius - ix - 1, 2 * radius - iy - 1}, c);
             }
         }
 
-        kernel.loadFromImage(kernel_image);
+        if (!kernel.loadFromImage(kernel_image)) {
+            spdlog::error("Could not load scalar field texture from image.");
+        }
         kernel.setSmooth(true);
     }
 
@@ -329,7 +329,7 @@ namespace wavy::sph {
                 value = solver.calculate_property(sim_position);
             }
 
-            auto v = static_cast<sf::Uint8>(255.f * glm::clamp(value * scale, 0.f, 1.f));
+            auto v = static_cast<std::uint8_t>(255.f * glm::clamp(value * scale, 0.f, 1.f));
             c = sf::Color{0, 0, 255, v};
         }
         return c;

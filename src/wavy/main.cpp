@@ -134,11 +134,14 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
     spdlog::info("Creating SFML window.");
 
     sf::ContextSettings settings;
-    settings.antialiasingLevel = 8;
-    sf::RenderWindow window(sf::VideoMode(conf.get_window_width(), conf.get_window_height()), "wavy",
-                            sf::Style::Default, settings);
+    settings.antiAliasingLevel = 8;
+    sf::RenderWindow window(sf::VideoMode({conf.get_window_width(), conf.get_window_height()}), "wavy",
+                            sf::Style::Default, sf::State::Windowed, settings);
     window.setFramerateLimit(60);
-    ImGui::SFML::Init(window);
+    if (!ImGui::SFML::Init(window))
+    {
+        spdlog::error("Could not initialize ImGui.");
+    }
 
     spdlog::debug("Starting main loop.");
     // wavy::sph::sph sph_manager{glm::vec2{1920.0f, 1080.0f}};
@@ -149,19 +152,19 @@ int main(int /* argc */, const char** /* argv */) // NOLINT(bugprone-exception-e
     while (window.isOpen()) {
         // check all the window's events that were triggered since the last iteration of the loop
         poll_clock.restart();
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            ImGui::SFML::ProcessEvent(window, event);
+        while (const auto event = window.pollEvent()) {
+            ImGui::SFML::ProcessEvent(window, *event);
 
             // "close requested" event: we close the window
-            if (event.type == sf::Event::Closed) { window.close(); }
-            if (event.type == sf::Event::Resized) {
+            if (event->is<sf::Event::Closed>()) { window.close(); }
+            if (const auto* resizeEvent = event->getIf<sf::Event::Resized>(); resizeEvent) {
                 // update the view to the new size of the window
-                sf::FloatRect visibleArea(0.f, 0.f, static_cast<float>(event.size.width),
-                                          static_cast<float>(event.size.height));
+                sf::FloatRect visibleArea{
+                    {0.f, 0.f},
+                    {static_cast<float>(resizeEvent->size.x), static_cast<float>(resizeEvent->size.y)}};
                 window.setView(sf::View(visibleArea));
             } else {
-                sph_manager.process_event(event);
+                sph_manager.process_event(*event);
             }
         }
         auto delta_t = delta_clock.restart();

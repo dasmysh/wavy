@@ -19,23 +19,22 @@ namespace wavy::sph {
 
     void sph_input::process_event(sph_conversions& conversions, sph_gui& gui, const sf::Event& event)
     {
-
         m_space_pressed = false;
         m_space_double_pressed = false;
         if (const auto& io = ImGui::GetIO(); !io.WantCaptureKeyboard) {
-            if (event.type == sf::Event::KeyReleased && event.key.scancode == sf::Keyboard::Scancode::Space) {
-                m_space_pressed = true;
-                if (m_space_double_timer.check()) {
-                    m_space_double_pressed = true;
-                } else {
-                    m_space_double_timer.start();
-                }
-            }
-
-            if (event.key.scancode == sf::Keyboard::Scancode::P) {
-                if (event.type == sf::Event::KeyPressed) {
+            if (const auto* keyPressed = event.getIf<sf::Event::KeyPressed>(); keyPressed) {
+                if (keyPressed->scancode == sf::Keyboard::Scancode::Space) {
+                    m_space_pressed = true;
+                    if (m_space_double_timer.check()) {
+                        m_space_double_pressed = true;
+                    } else {
+                        m_space_double_timer.start();
+                    }
+                } else if (keyPressed->scancode == sf::Keyboard::Scancode::P) {
                     m_p_down = true;
-                } else if (event.type == sf::Event::KeyReleased) {
+                }
+            } else if (const auto* keyReleased = event.getIf<sf::Event::KeyReleased>(); keyReleased) {
+                if (keyReleased->scancode == sf::Keyboard::Scancode::P) {
                     m_p_down = false;
                 }
             }
@@ -44,41 +43,34 @@ namespace wavy::sph {
         m_mouse_clicked = false;
         m_mouse_wheel_delta = 0.f;
         if (const auto& io = ImGui::GetIO(); !io.WantCaptureMouse) {
-            if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Left) {
-                set_mouse_position(conversions, event.mouseButton.x, event.mouseButton.y);
-                if (!m_p_down) {
-                    m_mouse_clicked = true;
-                    gui.reset_selected_particle();
+            if (const auto* mouseReleased = event.getIf<sf::Event::MouseButtonReleased>(); mouseReleased) {
+                if (mouseReleased->button == sf::Mouse::Button::Left) {
+                    set_mouse_position(conversions, mouseReleased->position.x, mouseReleased->position.y);
+                    if (!m_p_down) {
+                        m_mouse_clicked = true;
+                        gui.reset_selected_particle();
+                    }
+                    m_mouse_left_down = false;
+                } else if (mouseReleased->button == sf::Mouse::Button::Right) {
+                    if (!m_p_down) {
+                        gui.reset_selected_particle();
+                        gui.reset_selected_cell();
+                    }
+                    m_mouse_right_down = false;
                 }
-                m_mouse_left_down = false;
-            }
-
-            if (event.type == sf::Event::MouseButtonReleased && event.mouseButton.button == sf::Mouse::Right) {
-                if (!m_p_down) {
-                    gui.reset_selected_particle();
-                    gui.reset_selected_cell();
+            } else if (const auto* mousePressed = event.getIf<sf::Event::MouseButtonPressed>(); mousePressed) {
+                if (mousePressed->button == sf::Mouse::Button::Left && m_p_down) {
+                    m_mouse_left_down = true;
+                } else if (mousePressed->button == sf::Mouse::Button::Right && m_p_down) {
+                    m_mouse_right_down = true;
                 }
-                m_mouse_right_down = false;
-            }
-
-            if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left
-                && m_p_down) {
-                m_mouse_left_down = true;
-            }
-
-            if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Right
-                && m_p_down) {
-                m_mouse_right_down = true;
-            }
-
-            if (event.type == sf::Event::MouseWheelScrolled
-                && event.mouseWheelScroll.wheel == sf::Mouse::Wheel::VerticalWheel) {
-                set_mouse_position(conversions, event.mouseWheelScroll.x, event.mouseWheelScroll.y);
-                m_mouse_wheel_delta = static_cast<float>(event.mouseWheelScroll.delta);
-            }
-
-            if (event.type == sf::Event::MouseMoved) {
-                set_mouse_position(conversions, event.mouseMove.x, event.mouseMove.y);
+            } else if (const auto* mouseScrolled = event.getIf<sf::Event::MouseWheelScrolled>(); mouseScrolled) {
+                if (mouseScrolled->wheel == sf::Mouse::Wheel::Vertical) {
+                    set_mouse_position(conversions, mouseScrolled->position.x, mouseScrolled->position.y);
+                    m_mouse_wheel_delta = static_cast<float>(mouseScrolled->delta);
+                }
+            } else if (const auto* mouseMoved = event.getIf<sf::Event::MouseMoved>(); mouseMoved) {
+                set_mouse_position(conversions, mouseMoved->position.x, mouseMoved->position.y);
             }
         }
     }

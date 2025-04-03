@@ -50,7 +50,7 @@ find_package(imgui CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
-find_package(SFML CONFIG REQUIRED system window graphics)
+find_package(SFML CONFIG REQUIRED System Window Graphics)
 find_package(ImGui-SFML CONFIG REQUIRED)
 
 if(NOT EXISTS "${CMAKE_BINARY_DIR}/glm.natvis")
